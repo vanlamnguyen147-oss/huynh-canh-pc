@@ -36,7 +36,7 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
 .totalbar .amount{background:var(--blue);padding:13px 16px;font-size:clamp(17px,3vw,23px);font-weight:900;white-space:nowrap}
 .notes{margin-top:16px}.notes h3{margin:0;background:#15171b;color:white;padding:10px 12px;font-size:14px}.notes ul{padding-left:22px;margin:8px 0;color:#414b5a}.notes li{margin:5px 0}
 .footer{text-align:center;padding:10px;font-size:18px;font-weight:850;color:var(--blue)}
-.history-list{display:grid;gap:8px}.config-list{display:grid;gap:8px}.config-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:9px}.config-item small{display:block;color:var(--muted)}.history-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:9px}.history-item strong{display:block}.history-item small{color:var(--muted)}
+.history-list{display:grid;gap:8px}.history-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:9px}.history-item strong{display:block}.history-item small{color:var(--muted)}
 .empty{color:#758195;text-align:center;padding:15px}
 .hidden{display:none!important}.hint{font-size:12px;color:#6a7483;margin-top:7px}
 @media(max-width:760px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.wrap{padding:0 9px}.card{padding:12px}.mark{width:58px;font-size:26px}.history-item{align-items:flex-start;flex-direction:column}.toolbar button{flex:1}}
@@ -52,9 +52,34 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
  .rowdel,.hide-print{display:none!important}.totalbar{min-height:40px;margin-top:8px}.totalbar .label{font-size:19px}.totalbar .amount{font-size:17px;padding:9px}
  .notes{margin-top:9px}.notes h3{padding:7px}.notes ul{margin:5px 0}.footer{font-size:15px;padding:5px}
 }
+
+#authGate{position:fixed;inset:0;z-index:9999;background:#eef3f9;display:grid;place-items:center;padding:18px}
+#authGate .authbox{width:min(430px,100%);background:#fff;border:1px solid #d9e0ea;border-radius:18px;padding:24px;box-shadow:0 18px 60px #152b4a22}
+#authGate h2{margin:0 0 6px;font-size:23px}#authGate p{color:#687386;font-size:13px}
+#authGate .field{margin:12px 0}#authGate button{width:100%;margin-top:8px}
+#userBar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:#e8f3ff;border:1px solid #c7def7;padding:9px 12px;border-radius:10px;margin-bottom:12px}
+#adminPanel{border:1px solid #b8d5f5;background:#f7fbff}
+#adminPanel input{margin:4px 0}
+
 </style>
 </head>
 <body>
+
+<div id="authGate">
+ <div class="authbox">
+  <div style="font-weight:900;color:#087cf0;letter-spacing:.5px">HUỲNH CẢNH PC</div>
+  <h2>Đăng nhập hệ thống</h2>
+  <p>Quotation Pro · Tài khoản ADMIN / SALE</p>
+  <form id="loginForm">
+   <div class="field"><label>Email</label><input id="loginEmail" type="email" autocomplete="username" required placeholder="Email đăng nhập"></div>
+   <div class="field"><label>Mật khẩu</label><input id="loginPassword" type="password" autocomplete="current-password" required placeholder="Mật khẩu"></div>
+   <button type="submit">ĐĂNG NHẬP</button>
+  </form>
+  <p id="authMessage" role="status"></p>
+  <p style="font-size:11px">Tài khoản đầu tiên được tạo trong Supabase Authentication. Không đăng ký tài khoản công khai tại màn hình này.</p>
+ </div>
+</div>
+
 <header>
  <div class="brand">
   <div class="mark">H<span>C</span></div>
@@ -66,30 +91,30 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
  </div>
 </header>
 <main class="wrap">
+
+ <div id="userBar" class="no-print hidden">
+  <div><strong id="signedName">Đang đăng nhập</strong> <small id="signedRole"></small></div>
+  <div class="toolbar" style="margin:0"><button id="adminToggle" class="secondary hidden" onclick="toggleAdminPanel()">👥 Quản lý SALE</button><button class="dark" onclick="signOut()">Đăng xuất</button></div>
+ </div>
+ <section id="adminPanel" class="card no-print hidden">
+  <h2>Quản lý tài khoản SALE</h2>
+  <div class="grid">
+   <div class="field"><label>Email nhân viên</label><input id="newSaleEmail" type="email" placeholder="sale@example.com"></div>
+   <div class="field"><label>Mật khẩu tạm thời (tối thiểu 8 ký tự)</label><input id="newSalePassword" type="password" placeholder="Mật khẩu ban đầu"></div>
+   <div class="field"><label>Họ tên nhân viên</label><input id="newSaleName" placeholder="Tên nhân viên"></div>
+   <div class="field" style="justify-content:end"><button onclick="createSale()">＋ Tạo tài khoản SALE</button></div>
+  </div>
+  <p class="hint">Tạo tài khoản cần Edge Function admin-users được triển khai và cấu hình secret SUPABASE_SERVICE_ROLE_KEY. Không đặt service-role key trong trình duyệt.</p>
+  <div id="saleUsersList" class="history-list"></div>
+ </section>
+
  <div class="toolbar no-print">
   <button onclick="saveQuote()" class="green">💾 Lưu báo giá</button>
   <button onclick="exportJPG()">🖼 Xuất ảnh JPG</button>
   <button onclick="window.print()" class="dark">🖨 In báo giá A4</button>
   <button onclick="newQuote()" class="secondary">＋ Báo giá mới</button>
-  <button onclick="toggleSettings()" class="secondary">⚙ Thông tin cửa hàng</button>
+  <button id="settingsBtn" onclick="toggleSettings()" class="secondary">⚙ Thông tin cửa hàng</button>
  </div>
- <section class="card no-print" id="cloudPanel">
-  <h2>☁️ ĐỒNG BỘ ONLINE – NHIỀU NHÂN VIÊN</h2>
-  <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
-   <div class="field"><label>SUPABASE PROJECT URL</label><input id="sbUrl" placeholder="https://xxxx.supabase.co"></div>
-   <div class="field"><label>SUPABASE ANON / PUBLISHABLE KEY</label><input id="sbKey" placeholder="Dán public anon key tại đây"></div>
-   <div class="field"><label>EMAIL ĐĂNG NHẬP</label><input id="cloudEmail" type="email" placeholder="email@domain.com"></div>
-   <div class="field"><label>MẬT KHẨU</label><input id="cloudPassword" type="password" placeholder="Mật khẩu tài khoản"></div>
-  </div>
-  <div class="toolbar" style="margin-top:10px">
-   <button onclick="cloudSignIn()">Đăng nhập</button>
-   <button class="secondary" onclick="cloudSignUp()">Tạo tài khoản</button>
-   <button class="secondary" onclick="cloudSignOut()">Đăng xuất</button>
-   <button class="green" onclick="cloudSyncNow()">↻ Đồng bộ ngay</button>
-  </div>
-  <div id="cloudStatus" class="hint">Chưa kết nối. Cần tạo dự án Supabase và chạy file SQL đi kèm trước khi đăng nhập.</div>
-  <p class="hint">Dữ liệu trên thiết bị vẫn được lưu cục bộ. Khi đăng nhập, báo giá và kho cấu hình sẽ được đồng bộ với tài khoản trong cùng dự án. Chỉ chia sẻ public anon key; không đưa Service Role Key vào ứng dụng.</p>
- </section>
  <section id="settings" class="card no-print hidden">
   <h2>Thông tin cửa hàng</h2>
   <div class="grid">
@@ -138,15 +163,6 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
   <div class="footer"><span id="footContact">HUỲNH CẢNH PC</span> <span style="color:#151922">– Zalo: </span><span id="footPhone">Chưa cập nhật</span></div>
  </section>
  <section class="card no-print">
-  <h2>🧰 KHO CẤU HÌNH PC</h2>
-  <div class="grid" style="grid-template-columns:2fr 1fr;align-items:end">
-   <div class="field"><label>TÊN CẤU HÌNH MUỐN LƯU</label><input id="configName" placeholder="Ví dụ: PC Gaming i5 RTX 5060"></div>
-   <button onclick="saveConfig()">💾 Lưu cấu hình hiện tại</button>
-  </div>
-  <p class="hint">Nhập linh kiện ở bảng báo giá phía trên, sau đó đặt tên và lưu. Lần sau chỉ cần chọn “Nạp” để đưa toàn bộ linh kiện vào báo giá.</p>
-  <div id="configList" class="config-list"><div class="empty">Chưa có cấu hình nào. Hãy lưu cấu hình đầu tiên.</div></div>
- </section>
- <section class="card no-print">
   <h2>📚 Lịch sử báo giá đã lưu</h2>
   <div id="history" class="history-list"><div class="empty">Chưa có báo giá nào được lưu.</div></div>
   <div class="toolbar" style="margin-top:12px">
@@ -156,13 +172,18 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
   <p class="hint">Lưu ý: Dữ liệu nằm trong bộ nhớ trình duyệt của thiết bị. Hãy sao lưu định kỳ nếu đổi máy hoặc xóa dữ liệu trình duyệt.</p>
  </section>
 </main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+const SUPABASE_URL="https://qlsgdhwlakujazmlamdi.supabase.co";
+const SUPABASE_ANON_KEY="sb_publishable_pc6ZSiijOaaPGCpW7DIDiw_A_McLQYz";
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+let currentUser=null,currentProfile=null,cloudReady=false,cloudStoreId='default';
 const $=id=>document.getElementById(id);
 const money=n=>Number(n||0).toLocaleString('vi-VN');
 const today=()=>new Date().toISOString().slice(0,10);
 let rows=[];
+let editingQuoteId=null;
 let historyData=JSON.parse(localStorage.getItem('hcpc_history')||'[]');
-let configData=JSON.parse(localStorage.getItem('hcpc_configs')||'[]');
 let settings=JSON.parse(localStorage.getItem('hcpc_settings')||'{}');
 function applySettings(){
  $('shopName').value=settings.name||'HUỲNH CẢNH PC';$('shopAddress').value=settings.address||'';
@@ -172,9 +193,14 @@ function applySettings(){
  $('headPhone').textContent=settings.phone||'Chưa cập nhật';$('headContact').textContent=settings.contact?' | '+settings.contact:'';
  $('footContact').textContent=settings.name||'HUỲNH CẢNH PC';$('footPhone').textContent=settings.phone||'Chưa cập nhật';
 }
-function saveSettings(){
+async function saveSettings(){
  settings={name:$('shopName').value.trim()||'HUỲNH CẢNH PC',address:$('shopAddress').value.trim(),phone:$('shopPhone').value.trim(),contact:$('shopContact').value.trim()};
- localStorage.setItem('hcpc_settings',JSON.stringify(settings));applySettings();$('settings').classList.add('hidden');alert('Đã lưu thông tin cửa hàng.');
+ localStorage.setItem('hcpc_settings',JSON.stringify(settings));applySettings();$('settings').classList.add('hidden');
+ if(currentUser){
+  const {error}=await sb.from('hcpc_store_settings').upsert({id:cloudStoreId,data:settings,updated_by:currentUser.id,updated_at:new Date().toISOString()},{onConflict:'id'});
+  if(error){alert('Đã lưu trên thiết bị, nhưng đồng bộ cửa hàng lỗi: '+error.message);return}
+ }
+ alert('Đã lưu thông tin cửa hàng.');
 }
 function toggleSettings(){$('settings').classList.toggle('hidden')}
 function addRow(item={}){
@@ -220,75 +246,46 @@ function addSample(){
  ];
  sample.forEach(x=>addRow({category:x[0],name:x[1],warranty:x[2],qty:x[3],price:x[4]}));calc();
 }
-
-function saveConfig(){
- const name=$('configName').value.trim();
- if(!name){alert('Bạn hãy nhập tên cấu hình trước khi lưu.');$('configName').focus();return}
- const data={id:Date.now().toString(),name,rows:getRows(),createdAt:new Date().toISOString()};
- if(!data.rows.length){alert('Chưa có linh kiện để lưu.');return}
- configData.unshift(data);
- localStorage.setItem('hcpc_configs',JSON.stringify(configData));
- $('configName').value='';renderConfigs();
- alert('Đã lưu cấu hình: '+name);
-}
-function renderConfigs(){
- const el=$('configList');
- if(!configData.length){el.innerHTML='<div class="empty">Chưa có cấu hình nào. Hãy lưu cấu hình đầu tiên.</div>';return}
- el.innerHTML=configData.map(c=>{
-  const count=(c.rows||[]).length;
-  const sum=(c.rows||[]).reduce((a,r)=>a+(Number(r.qty)||0)*(Number(r.price)||0),0);
-  return `<div class="config-item"><div><strong>${esc(c.name)}</strong><small>${count} linh kiện · ${money(sum)} đ</small></div><div class="toolbar" style="margin:0"><button onclick="loadConfig('${c.id}')">Nạp</button><button class="secondary" onclick="renameConfig('${c.id}')">Đổi tên</button><button class="danger" onclick="deleteConfig('${c.id}')">Xóa</button></div></div>`;
- }).join('');
-}
-function loadConfig(id){
- const c=configData.find(x=>x.id===id);if(!c)return;
- if(!confirm('Nạp cấu hình “'+c.name+'”? Danh sách linh kiện hiện tại sẽ được thay thế.'))return;
- $('partsBody').innerHTML='';(c.rows||[]).forEach(addRow);if(!c.rows?.length)addRow();calc();
- window.scrollTo({top:0,behavior:'smooth'});
-}
-function renameConfig(id){
- const c=configData.find(x=>x.id===id);if(!c)return;
- const name=prompt('Nhập tên mới cho cấu hình:',c.name);
- if(name===null)return;if(!name.trim()){alert('Tên cấu hình không được để trống.');return}
- c.name=name.trim();localStorage.setItem('hcpc_configs',JSON.stringify(configData));renderConfigs();
-}
-function deleteConfig(id){
- const c=configData.find(x=>x.id===id);if(!c)return;
- if(!confirm('Xóa cấu hình “'+c.name+'”?'))return;
- configData=configData.filter(x=>x.id!==id);localStorage.setItem('hcpc_configs',JSON.stringify(configData));renderConfigs();
-}
-
 function formData(){
- return {id:Date.now().toString(),quoteNo:$('quoteNo').value,quoteDate:$('quoteDate').value,validHours:$('validHours').value,
+ return {id:(editingQuoteId||Date.now().toString()),quoteNo:$('quoteNo').value,quoteDate:$('quoteDate').value,validHours:$('validHours').value,
  preparedBy:$('preparedBy').value,customer:$('customer').value,customerInfo:$('customerInfo').value,
  rows:getRows(),total:getRows().reduce((a,r)=>a+r.qty*r.price,0),savedAt:new Date().toISOString()};
 }
 function fillForm(q){
+ editingQuoteId=q.id?String(q.id):null;
  $('quoteNo').value=q.quoteNo||'';$('quoteDate').value=q.quoteDate||today();$('validHours').value=q.validHours||12;
  $('preparedBy').value=q.preparedBy||'';$('customer').value=q.customer||'';$('customerInfo').value=q.customerInfo||'';
  $('partsBody').innerHTML='';(q.rows||[]).forEach(addRow);if(!q.rows?.length)addRow();updateValid();calc();
 }
-function saveQuote(){
+async function saveQuote(){
  const q=formData();if(!q.quoteNo)q.quoteNo='HC-'+new Date().toISOString().replace(/[-:T.Z]/g,'').slice(0,12);
  $('quoteNo').value=q.quoteNo;
- const old=historyData.findIndex(x=>x.id===q.id);
+ editingQuoteId=String(q.id);const old=historyData.findIndex(x=>String(x.id)===String(q.id));
+ if(old>=0) historyData.splice(old,1);
  historyData.unshift(q);historyData=historyData.slice(0,100);
  localStorage.setItem('hcpc_history',JSON.stringify(historyData));renderHistory();
- alert('Đã lưu báo giá '+q.quoteNo+' trên thiết bị.');
+ if(!currentUser){alert('Bạn chưa đăng nhập.');return}
+ const payload={local_id:String(q.id),data:q,customer_name:q.customer||'',quote_no:q.quoteNo,total:q.total,created_by:currentUser.id,updated_at:new Date().toISOString()};
+ const {error}=await sb.from('hcpc_quotes').upsert(payload,{onConflict:'local_id'});
+ if(error){alert('Đã lưu trên thiết bị nhưng chưa đồng bộ Supabase: '+error.message);return}
+ alert('Đã lưu và đồng bộ báo giá '+q.quoteNo+'.');
 }
+
 function renderHistory(){
  const el=$('history');if(!historyData.length){el.innerHTML='<div class="empty">Chưa có báo giá nào được lưu.</div>';return}
- el.innerHTML=historyData.map(q=>`<div class="history-item"><div><strong>${esc(q.quoteNo||'Báo giá')}</strong><small>${esc(q.customer||'Khách lẻ')} · ${esc(q.quoteDate||'')} · ${money(q.total)} đ</small></div><div class="toolbar" style="margin:0"><button class="secondary" onclick="loadQuote('${q.id}')">Mở</button><button class="danger" onclick="deleteQuote('${q.id}')">Xóa</button></div></div>`).join('');
+ el.innerHTML=historyData.map(q=>`<div class="history-item"><div><strong>${esc(q.quoteNo||'Báo giá')}</strong><small>${esc(q.customer||'Khách lẻ')} · ${esc(q.quoteDate||'')} · ${money(q.total)} đ</small></div><div class="toolbar" style="margin:0"><button class="secondary" onclick="loadQuote('${q.id}')">Mở</button>${(currentProfile?.role==='admin'||q.owner_id===currentUser?.id)?`<button class="danger" onclick="deleteQuote('${q.id}')">Xóa</button>`:''}</div></div>`).join('');
 }
 function loadQuote(id){const q=historyData.find(x=>x.id===id);if(q){fillForm(q);window.scrollTo({top:0,behavior:'smooth'})}}
-function deleteQuote(id){if(!confirm('Xóa báo giá này khỏi lịch sử?'))return;historyData=historyData.filter(x=>x.id!==id);localStorage.setItem('hcpc_history',JSON.stringify(historyData));renderHistory()}
-function newQuote(){if(!confirm('Tạo báo giá mới? Hãy lưu báo giá hiện tại trước nếu cần.'))return;fillForm({rows:[]});$('quoteNo').value='';$('customer').value='';$('customerInfo').value='';addRow()}
+async function deleteQuote(id){if(!confirm('Xóa báo giá này khỏi lịch sử?'))return;
+ if(currentUser){const {error}=await sb.from('hcpc_quotes').delete().eq('local_id',String(id));if(error){alert('Không xóa được trên máy chủ: '+error.message);return}}
+ historyData=historyData.filter(x=>x.id!==id);localStorage.setItem('hcpc_history',JSON.stringify(historyData));renderHistory()}
+function newQuote(){if(!confirm('Tạo báo giá mới? Hãy lưu báo giá hiện tại trước nếu cần.'))return;editingQuoteId=null;fillForm({rows:[]});$('quoteNo').value='';$('customer').value='';$('customerInfo').value='';addRow()}
 function backupData(){
- const data={settings,history:historyData,configs:configData,exportedAt:new Date().toISOString()};
+ const data={settings,history:historyData,exportedAt:new Date().toISOString()};
  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});downloadBlob(blob,'HUYNH_CANH_PC_backup.json');
 }
 function restoreData(e){
- const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d.settings){settings=d.settings;localStorage.setItem('hcpc_settings',JSON.stringify(settings));applySettings()}if(Array.isArray(d.history)){historyData=d.history;localStorage.setItem('hcpc_history',JSON.stringify(historyData));renderHistory()}if(Array.isArray(d.configs)){configData=d.configs;localStorage.setItem('hcpc_configs',JSON.stringify(configData));renderConfigs()}alert('Đã khôi phục dữ liệu.')}catch(err){alert('File sao lưu không hợp lệ.')}};r.readAsText(f);e.target.value='';
+ const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d.settings){settings=d.settings;localStorage.setItem('hcpc_settings',JSON.stringify(settings));applySettings()}if(Array.isArray(d.history)){historyData=d.history;localStorage.setItem('hcpc_history',JSON.stringify(historyData));renderHistory()}alert('Đã khôi phục dữ liệu.')}catch(err){alert('File sao lưu không hợp lệ.')}};r.readAsText(f);e.target.value='';
 }
 function downloadBlob(blob,name){const a=document.createElement('a');const u=URL.createObjectURL(blob);a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1500)}
 function exportJPG(){
@@ -331,112 +328,79 @@ function exportJPG(){
  c.fillStyle='#087cf0';c.textAlign='center';c.font='bold 25px Arial';c.fillText((settings.name||'HUỲNH CẢNH PC')+'  –  Zalo: '+(settings.phone||'Chưa cập nhật'),W/2,yn+205);
  const a=canvas.toDataURL('image/jpeg',.94);const link=document.createElement('a');link.href=a;link.download=(q.quoteNo||'Bao_gia_Huynh_Canh_PC')+'.jpg';link.click();
 }
-function init(){
- applySettings();$('quoteDate').value=today();$('preparedBy').value=settings.contact||'';
- addRow();renderHistory();renderConfigs();updateValid();
+async function loadCloudData(){
+ // Preserve legacy local-only quotes and upload missing IDs as owned by the first signed-in user.
+ const legacy=JSON.parse(localStorage.getItem('hcpc_history')||'[]');
+ const {data:initial,error:initialError}=await sb.from('hcpc_quotes').select('local_id').limit(1000);
+ if(initialError) throw initialError;
+ const known=new Set((initial||[]).map(r=>String(r.local_id)));
+ for(const q of legacy){
+  if(!known.has(String(q.id))){
+   const {error:uploadError}=await sb.from('hcpc_quotes').insert({
+    local_id:String(q.id),data:q,customer_name:q.customer||'',quote_no:q.quoteNo||'',
+    total:Number(q.total||0),created_by:currentUser.id,updated_at:new Date().toISOString()
+   });
+   if(uploadError && !String(uploadError.message).toLowerCase().includes('duplicate')) throw uploadError;
+  }
+ }
+ const {data:quotes,error}=await sb.from('hcpc_quotes').select('local_id,data,created_by,updated_at').order('updated_at',{ascending:false}).limit(500);
+ if(error) throw error;
+ historyData=(quotes||[]).map(r=>({...((r.data&&typeof r.data==='object')?r.data:{}),id:r.local_id,owner_id:r.created_by,cloud_updated_at:r.updated_at}));
+ localStorage.setItem('hcpc_history',JSON.stringify(historyData));renderHistory();
+ const {data:store,error:se}=await sb.from('hcpc_store_settings').select('id,data').limit(1).maybeSingle();
+ if(se) throw se;
+ if(store?.id) cloudStoreId=store.id;
+ if(store?.data){settings=store.data;localStorage.setItem('hcpc_settings',JSON.stringify(settings));applySettings();}
+}
+async function bootAuth(){
+ $('loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();$('authMessage').textContent='Đang đăng nhập...';
+  const {error}=await sb.auth.signInWithPassword({email:$('loginEmail').value.trim(),password:$('loginPassword').value});
+  $('authMessage').textContent=error?error.message:'Đăng nhập thành công.';
+ });
+ const {data:{session}}=await sb.auth.getSession();
+ if(session) await handleSession(session);
+ sb.auth.onAuthStateChange((_event,session)=>{setTimeout(()=>handleSession(session),0)});
  if('serviceWorker' in navigator && location.protocol!=='file:'){navigator.serviceWorker.register('./sw.js').catch(()=>{})}
+}
+async function handleSession(session){
+ if(!session){currentUser=null;currentProfile=null;$('authGate').classList.remove('hidden');$('userBar').classList.add('hidden');$('adminPanel').classList.add('hidden');$('authMessage').textContent='';return}
+ currentUser=session.user;
+ const {data:profile,error}=await sb.from('hcpc_profiles').select('email,full_name,role,active').eq('id',currentUser.id).single();
+ if(error||!profile||!profile.active){await sb.auth.signOut();$('authMessage').textContent='Tài khoản chưa được cấp quyền hoặc đã bị khóa.';return}
+ currentProfile=profile;
+ $('authGate').classList.add('hidden');$('userBar').classList.remove('hidden');
+ $('signedName').textContent=profile.full_name||profile.email;
+ $('signedRole').textContent='· '+(profile.role==='admin'?'ADMIN':'SALE');
+ $('adminToggle').classList.toggle('hidden',profile.role!=='admin');$('settingsBtn').classList.toggle('hidden',profile.role!=='admin');
+ $('adminPanel').classList.add('hidden');
+ try{await loadCloudData();cloudReady=true}catch(err){alert('Đăng nhập thành công nhưng tải dữ liệu lỗi: '+err.message)}
+ applySettings();$('quoteDate').value=today();$('preparedBy').value=profile.full_name||settings.contact||'';
+ if(!$('partsBody').children.length)addRow();
+ renderHistory();updateValid();
+}
+async function signOut(){await sb.auth.signOut()}
+function toggleAdminPanel(){$('adminPanel').classList.toggle('hidden');if(!$('adminPanel').classList.contains('hidden'))loadSaleUsers()}
+async function createSale(){
+ const email=$('newSaleEmail').value.trim(),password=$('newSalePassword').value,full_name=$('newSaleName').value.trim();
+ if(!email||password.length<8){alert('Nhập email hợp lệ và mật khẩu ít nhất 8 ký tự.');return}
+ const {data,error}=await sb.functions.invoke('admin-users',{body:{action:'create',email,password,full_name}});
+ if(error){alert('Không tạo được tài khoản: '+error.message);return}
+ alert('Đã tạo tài khoản SALE: '+email);$('newSaleEmail').value='';$('newSalePassword').value='';$('newSaleName').value='';loadSaleUsers();
+}
+async function loadSaleUsers(){
+ const {data,error}=await sb.from('hcpc_profiles').select('id,email,full_name,role,active').order('email');
+ if(error){$('saleUsersList').textContent=error.message;return}
+ $('saleUsersList').innerHTML=(data||[]).filter(u=>u.role==='sale').map(u=>`<div class="history-item"><div><strong>${esc(u.full_name||u.email)}</strong><small>${esc(u.email)} · ${u.active?'Đang hoạt động':'Đã khóa'}</small></div><button class="${u.active?'danger':'green'}" onclick="setSaleActive('${u.id}',${!u.active})">${u.active?'Khóa':'Mở khóa'}</button></div>`).join('')||'<div class="empty">Chưa có tài khoản SALE.</div>';
+}
+async function setSaleActive(id,active){
+ const {error}=await sb.functions.invoke('admin-users',{body:{action:'set_active',user_id:id,active}});
+ if(error){alert(error.message);return}loadSaleUsers();
+}
+async function init(){
+ applySettings();$('quoteDate').value=today();$('preparedBy').value=settings.contact||'';
+ addRow();renderHistory();updateValid();await bootAuth();
 }
 init();
 </script>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-let cloudClient=null, cloudUser=null;
-const CLOUD_CONFIG_KEY='hcpc_cloud_config';
-function cloudMsg(msg,ok=false){const el=document.getElementById('cloudStatus');if(el){el.textContent=msg;el.style.color=ok?'#138a55':'#687386'}}
-function cloudSavedConfig(){
- try{return JSON.parse(localStorage.getItem(CLOUD_CONFIG_KEY)||'{}')}catch(e){return {}}
-}
-function cloudInit(){
- const c=cloudSavedConfig();
- if(c.url)document.getElementById('sbUrl').value=c.url;
- if(c.key)document.getElementById('sbKey').value=c.key;
- if(!window.supabase){cloudMsg('Không tải được thư viện kết nối. Kiểm tra Internet rồi tải lại trang.');return}
- if(c.url&&c.key){try{cloudClient=window.supabase.createClient(c.url,c.key);cloudMsg('Đã cấu hình máy chủ. Hãy đăng nhập để đồng bộ.')}catch(e){cloudMsg('Thông tin dự án chưa hợp lệ: '+e.message)}}
-}
-function cloudGetClient(){
- const url=document.getElementById('sbUrl').value.trim();
- const key=document.getElementById('sbKey').value.trim();
- if(!url||!key){alert('Hãy nhập Project URL và public anon/publishable key.');return null}
- localStorage.setItem(CLOUD_CONFIG_KEY,JSON.stringify({url,key}));
- if(!window.supabase){alert('Thư viện Supabase chưa tải được.');return null}
- cloudClient=window.supabase.createClient(url,key);
- return cloudClient;
-}
-async function cloudSignUp(){
- const c=cloudGetClient();if(!c)return;
- const email=document.getElementById('cloudEmail').value.trim(),password=document.getElementById('cloudPassword').value;
- if(!email||password.length<8){alert('Nhập email và mật khẩu tối thiểu 8 ký tự.');return}
- cloudMsg('Đang tạo tài khoản…');
- const {data,error}=await c.auth.signUp({email,password});
- if(error){cloudMsg('Lỗi tạo tài khoản: '+error.message);return}
- cloudMsg(data.session?'Tạo tài khoản thành công. Đã đăng nhập.':'Đã gửi yêu cầu đăng ký. Kiểm tra email để xác nhận, sau đó đăng nhập.',true);
- if(data.session){cloudUser=data.user;await cloudSyncNow()}
-}
-async function cloudSignIn(){
- const c=cloudGetClient();if(!c)return;
- const email=document.getElementById('cloudEmail').value.trim(),password=document.getElementById('cloudPassword').value;
- if(!email||!password){alert('Nhập email và mật khẩu.');return}
- cloudMsg('Đang đăng nhập…');
- const {data,error}=await c.auth.signInWithPassword({email,password});
- if(error){cloudMsg('Đăng nhập thất bại: '+error.message);return}
- cloudUser=data.user;cloudMsg('Đã đăng nhập: '+cloudUser.email,true);await cloudSyncNow();
-}
-async function cloudSignOut(){
- if(!cloudClient){cloudMsg('Chưa kết nối máy chủ.');return}
- const {error}=await cloudClient.auth.signOut();
- cloudUser=null;cloudMsg(error?'Lỗi đăng xuất: '+error.message:'Đã đăng xuất khỏi tài khoản.');
-}
-async function cloudRequireUser(){
- if(!cloudClient){cloudGetClient();if(!cloudClient)return false}
- const {data,error}=await cloudClient.auth.getUser();
- if(error||!data.user){cloudMsg('Bạn chưa đăng nhập.');return false}
- cloudUser=data.user;return true;
-}
-async function cloudSyncNow(){
- if(!await cloudRequireUser())return;
- cloudMsg('Đang đồng bộ dữ liệu…');
- try{
-  // Push current local store settings
-  const st=JSON.parse(localStorage.getItem('hcpc_settings')||'{}');
-  const {error:se}=await cloudClient.from('hcpc_store_settings').upsert({id:'main',data:st,updated_by:cloudUser.id,updated_at:new Date().toISOString()});
-  if(se)throw se;
-  // Push local quotations using stable local IDs
-  const localQuotes=JSON.parse(localStorage.getItem('hcpc_history')||'[]');
-  if(localQuotes.length){
-   const payload=localQuotes.map(q=>({local_id:String(q.id),data:q,customer_name:q.customer||'',quote_no:q.quoteNo||'',total:Number(q.total)||0,created_by:cloudUser.id,updated_at:new Date().toISOString()}));
-   const {error}=await cloudClient.from('hcpc_quotes').upsert(payload,{onConflict:'local_id'});
-   if(error)throw error;
-  }
-  // Push local configuration library
-  const localConfigs=JSON.parse(localStorage.getItem('hcpc_configs')||'[]');
-  if(localConfigs.length){
-   const payload=localConfigs.map(c=>({local_id:String(c.id),name:c.name||'',data:c,created_by:cloudUser.id,updated_at:new Date().toISOString()}));
-   const {error}=await cloudClient.from('hcpc_pc_configs').upsert(payload,{onConflict:'local_id'});
-   if(error)throw error;
-  }
-  // Pull shared settings, quotations and configs
-  const {data:settingsRows,error:se2}=await cloudClient.from('hcpc_store_settings').select('data').eq('id','main').limit(1);
-  if(se2)throw se2;
-  if(settingsRows&&settingsRows[0]&&settingsRows[0].data){
-   settings=settingsRows[0].data;localStorage.setItem('hcpc_settings',JSON.stringify(settings));applySettings();
-  }
-  const {data:quotes,error:qe}=await cloudClient.from('hcpc_quotes').select('data,local_id').order('updated_at',{ascending:false}).limit(500);
-  if(qe)throw qe;
-  const quoteMap=new Map((historyData||[]).map(q=>[String(q.id),q]));
-  (quotes||[]).forEach(r=>{if(r.data)quoteMap.set(String(r.local_id),r.data)});
-  historyData=[...quoteMap.values()].sort((a,b)=>String(b.savedAt||'').localeCompare(String(a.savedAt||''))).slice(0,500);
-  localStorage.setItem('hcpc_history',JSON.stringify(historyData));renderHistory();
-  const {data:configs,error:ce}=await cloudClient.from('hcpc_pc_configs').select('data,local_id').order('updated_at',{ascending:false}).limit(500);
-  if(ce)throw ce;
-  const configMap=new Map((configData||[]).map(c=>[String(c.id),c]));
-  (configs||[]).forEach(r=>{if(r.data)configMap.set(String(r.local_id),r.data)});
-  configData=[...configMap.values()];
-  localStorage.setItem('hcpc_configs',JSON.stringify(configData));renderConfigs();
-  cloudMsg('Đồng bộ hoàn tất. Báo giá: '+historyData.length+' · Cấu hình: '+configData.length+'.',true);
- }catch(e){cloudMsg('Đồng bộ chưa thành công: '+(e.message||String(e))+' — kiểm tra đã chạy SQL và bật quyền truy cập chưa.')}
-}
-window.addEventListener('load',cloudInit);
-</script>
-
 </body></html>

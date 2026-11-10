@@ -1,29 +1,22 @@
-HUỲNH CẢNH PC – QUOTATION PRO V3 ONLINE
-=======================================
+HUỲNH CẢNH PC – QUOTATION PRO
+================================
 
-BỘ NÀY ĐÃ TÍCH HỢP KẾT NỐI SUPABASE:
-- Đăng ký / đăng nhập email, mật khẩu.
-- Đồng bộ báo giá, kho cấu hình PC và thông tin cửa hàng.
-- Dữ liệu local vẫn được giữ trên thiết bị.
-- Dùng chung dữ liệu cho các tài khoản đã đăng nhập cùng một Supabase project.
+Cài đặt PWA trên iPhone / Android
+1. Giải nén toàn bộ thư mục.
+2. Đưa thư mục lên một máy chủ HTTPS (ví dụ hosting HTTPS hoặc GitHub Pages).
+   PWA cần HTTPS để cài đặt và chạy Service Worker; mở trực tiếp file index.html
+   không kích hoạt được chế độ cài PWA.
+3. Mở địa chỉ website bằng Safari (iPhone) hoặc Chrome (Android).
+4. iPhone: Chia sẻ > Thêm vào MH chính.
+   Android: Menu Chrome > Cài đặt ứng dụng / Thêm vào màn hình chính.
 
-CẦN THIẾT LẬP MỘT LẦN:
-1. Tạo tài khoản tại https://supabase.com và tạo project.
-2. Mở SQL Editor, dán toàn bộ nội dung SUPABASE_SETUP.sql rồi Run.
-3. Vào Project Settings > API (hoặc Data API / API Keys), sao chép Project URL
-   và public anon/publishable key. TUYỆT ĐỐI KHÔNG dùng service_role/secret key.
-4. Đưa TOÀN BỘ file trong gói lên hosting HTTPS (GitHub Pages, Netlify hoặc hosting khác).
-5. Mở website, điền Project URL, public key, email và mật khẩu.
-6. Tạo tài khoản cho từng nhân viên hoặc đăng ký từ màn hình ứng dụng.
-   Nếu bật xác nhận email trong Supabase, xác nhận email trước khi đăng nhập.
-7. Sau khi đăng nhập, nhấn “Đồng bộ ngay” trên từng thiết bị.
+Sử dụng
+- Thông tin cửa hàng: bấm “Thông tin cửa hàng”, nhập địa chỉ và Zalo rồi lưu.
+- Thêm linh kiện, số lượng, đơn giá, bảo hành; tổng tiền tự tính.
+- Lưu báo giá để xem lại trong lịch sử trên chính thiết bị.
+- Xuất JPG, in A4, sao lưu/khôi phục dữ liệu JSON.
+- Nút “Nạp cấu hình mẫu” nạp các linh kiện minh họa từ mẫu thiết kế.
 
-LƯU Ý QUAN TRỌNG:
-- Đây là bản đồng bộ thủ công qua nút “Đồng bộ ngay”, không phải realtime tức thì.
-- Bản hiện tại hợp nhất danh sách theo ID; nếu hai người cùng sửa một báo giá/cấu hình
-  ở hai máy cùng lúc, cần thống nhất người chỉnh sửa để tránh ghi đè.
-- Các tài khoản đã đăng nhập cùng project được quyền đọc/ghi dữ liệu chung.
-  Chỉ tạo tài khoản cho nhân viên tin cậy. Chưa có phân quyền admin/nhân viên.
-- Supabase free tier có giới hạn dung lượng và có thể tạm dừng project ít hoạt động.
-- Dữ liệu cục bộ không tự biến mất; nên sao lưu JSON trước khi triển khai.
-- Service worker đã đổi cache version để trình duyệt nhận bản mới.
+Lưu ý dữ liệu
+Dữ liệu được lưu trong localStorage của trình duyệt trên thiết bị. Không tự đồng bộ
+giữa iPhone và Android. Hãy dùng chức năng Sao lưu dữ liệu để giữ bản dự phòng.
