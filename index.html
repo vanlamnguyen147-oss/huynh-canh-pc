@@ -93,7 +93,7 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
 <main class="wrap">
 
  <div id="userBar" class="no-print hidden">
-  <div><strong id="signedName">Đang đăng nhập</strong> <small id="signedRole"></small></div>
+  <div><strong id="signedName">Đang đăng nhập</strong> <small id="signedRole"></small> <small id="syncStatus" style="color:#16834b;margin-left:8px">● Đang kết nối</small></div>
   <div class="toolbar" style="margin:0"><button id="adminToggle" class="secondary hidden" onclick="toggleAdminPanel()">👥 Quản lý SALE</button><button class="dark" onclick="signOut()">Đăng xuất</button></div>
  </div>
  <section id="adminPanel" class="card no-print hidden">
@@ -123,8 +123,8 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
    <div class="field"><label>Số Zalo / Hotline</label><input id="shopPhone" placeholder="Nhập số điện thoại"></div>
    <div class="field"><label>Người phụ trách</label><input id="shopContact" placeholder="Tên người phụ trách"></div>
   </div>
-  <p class="hint">Thông tin được lưu trên thiết bị này và hiển thị ở đầu/cuối báo giá.</p>
-  <button onclick="saveSettings()">Lưu thông tin</button>
+  <p class="hint">Thông tin tự lưu sau khi bạn ngừng nhập và đồng bộ lên Supabase để ADMIN / SALE dùng chung. <span id="settingsStatus">Chưa có thay đổi.</span></p>
+  <button onclick="saveSettings()">Lưu thông tin ngay</button>
  </section>
  <section class="card">
   <div class="title">
@@ -169,7 +169,7 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
    <button class="secondary" onclick="backupData()">⬇ Sao lưu dữ liệu</button>
    <label class="filebtn secondary">⬆ Khôi phục dữ liệu<input type="file" accept="application/json" onchange="restoreData(event)" hidden></label>
   </div>
-  <p class="hint">Lưu ý: Dữ liệu nằm trong bộ nhớ trình duyệt của thiết bị. Hãy sao lưu định kỳ nếu đổi máy hoặc xóa dữ liệu trình duyệt.</p>
+  <p class="hint">Dữ liệu báo giá được đồng bộ qua Supabase. Danh sách tự làm mới khoảng 10 giây/lần khi đang mở trang; hãy sao lưu định kỳ để có bản dự phòng.</p>
  </section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -185,22 +185,61 @@ let rows=[];
 let editingQuoteId=null;
 let historyData=JSON.parse(localStorage.getItem('hcpc_history')||'[]');
 let settings=JSON.parse(localStorage.getItem('hcpc_settings')||'{}');
-function applySettings(){
- $('shopName').value=settings.name||'HUỲNH CẢNH PC';$('shopAddress').value=settings.address||'';
- $('shopPhone').value=settings.phone||'';$('shopContact').value=settings.contact||'';
+let settingsSaveTimer=null,settingsSaving=false,lastCloudSettingsAt=null;
+function applySettings(fillForm=true){
+ if(fillForm){$('shopName').value=settings.name||'HUỲNH CẢNH PC';$('shopAddress').value=settings.address||'';
+ $('shopPhone').value=settings.phone||'';$('shopContact').value=settings.contact||'';}
  $('headShop').textContent=settings.name||'HUỲNH CẢNH PC';
  $('headAddress').textContent=[settings.address,'PC Gaming – Đồ họa – Workstation'].filter(Boolean).join('  |  ');
  $('headPhone').textContent=settings.phone||'Chưa cập nhật';$('headContact').textContent=settings.contact?' | '+settings.contact:'';
  $('footContact').textContent=settings.name||'HUỲNH CẢNH PC';$('footPhone').textContent=settings.phone||'Chưa cập nhật';
 }
-async function saveSettings(){
- settings={name:$('shopName').value.trim()||'HUỲNH CẢNH PC',address:$('shopAddress').value.trim(),phone:$('shopPhone').value.trim(),contact:$('shopContact').value.trim()};
- localStorage.setItem('hcpc_settings',JSON.stringify(settings));applySettings();$('settings').classList.add('hidden');
- if(currentUser){
-  const {error}=await sb.from('hcpc_store_settings').upsert({id:cloudStoreId,data:settings,updated_by:currentUser.id,updated_at:new Date().toISOString()},{onConflict:'id'});
-  if(error){alert('Đã lưu trên thiết bị, nhưng đồng bộ cửa hàng lỗi: '+error.message);return}
+function readSettingsForm(){
+ return {name:$('shopName').value.trim()||'HUỲNH CẢNH PC',address:$('shopAddress').value.trim(),phone:$('shopPhone').value.trim(),contact:$('shopContact').value.trim()};
+}
+function updateSettingsPreview(){
+ settings=readSettingsForm();localStorage.setItem('hcpc_settings',JSON.stringify(settings));applySettings(false);
+}
+function scheduleSettingsSave(){
+ updateSettingsPreview();
+ const hint=$('settingsStatus');if(hint)hint.textContent='Đang lưu tự động…';
+ clearTimeout(settingsSaveTimer);settingsSaveTimer=setTimeout(()=>saveSettings(true),700);
+}
+async function saveSettings(silent=false){
+ clearTimeout(settingsSaveTimer);settingsSaveTimer=null;
+ settings=readSettingsForm();localStorage.setItem('hcpc_settings',JSON.stringify(settings));applySettings(false);
+ if(!currentUser){if(!silent)alert('Đã lưu thông tin trên thiết bị này.');return}
+ if(settingsSaving){settingsSaveTimer=setTimeout(()=>saveSettings(silent),500);return}
+ settingsSaving=true;
+ const hint=$('settingsStatus');if(hint)hint.textContent='Đang đồng bộ lên máy chủ…';
+ try{
+  const savedAt=new Date().toISOString();
+  const {error}=await sb.from('hcpc_store_settings').upsert({id:cloudStoreId,data:settings,updated_by:currentUser.id,updated_at:savedAt},{onConflict:'id'});
+  if(error)throw error;
+  lastCloudSettingsAt=savedAt;
+  if(hint)hint.textContent='✓ Đã tự lưu và đồng bộ cửa hàng';
+  if(!silent){$('settings').classList.add('hidden');alert('Đã lưu và đồng bộ thông tin cửa hàng lên Supabase.');}
+ }catch(error){
+  if(hint)hint.textContent='⚠ Đã lưu trên máy này, nhưng đồng bộ lỗi: '+error.message;
+  if(!silent)alert('Đã lưu trên thiết bị, nhưng đồng bộ cửa hàng lỗi: '+error.message);
+ }finally{settingsSaving=false}
+}
+function bindSettingsAutoSave(){
+ ['shopName','shopAddress','shopPhone','shopContact'].forEach(id=>{
+  const el=$(id);el.addEventListener('input',scheduleSettingsSave);
+  el.addEventListener('change',()=>saveSettings(true));
+ });
+}
+async function refreshCloudSettings(){
+ const {data:store,error}=await sb.from('hcpc_store_settings').select('id,data,updated_at').limit(1).maybeSingle();
+ if(error)throw error;
+ if(!store)return;
+ if(store.id)cloudStoreId=store.id;
+ const remoteTime=store.updated_at||'';
+ const formFocused=['shopName','shopAddress','shopPhone','shopContact'].includes(document.activeElement?.id);
+ if(store.data&&!formFocused&&!settingsSaveTimer&&remoteTime!==lastCloudSettingsAt){
+  settings=store.data;lastCloudSettingsAt=remoteTime;localStorage.setItem('hcpc_settings',JSON.stringify(settings));applySettings();
  }
- alert('Đã lưu thông tin cửa hàng.');
 }
 function toggleSettings(){$('settings').classList.toggle('hidden')}
 function addRow(item={}){
@@ -268,7 +307,7 @@ async function saveQuote(){
  const payload={local_id:String(q.id),data:q,customer_name:q.customer||'',quote_no:q.quoteNo,total:q.total,created_by:currentUser.id,updated_at:new Date().toISOString()};
  const {error}=await sb.from('hcpc_quotes').upsert(payload,{onConflict:'local_id'});
  if(error){alert('Đã lưu trên thiết bị nhưng chưa đồng bộ Supabase: '+error.message);return}
- alert('Đã lưu và đồng bộ báo giá '+q.quoteNo+'.');
+ await refreshCloudQuotes(false);alert('Đã lưu và đồng bộ báo giá '+q.quoteNo+'.');
 }
 
 function renderHistory(){
@@ -326,7 +365,27 @@ function exportJPG(){
  c.fillText('• Thời gian bảo hành được ghi theo từng linh kiện trong bảng.',35,yn+111);
  c.fillText('• Cảm ơn Quý khách đã tin tưởng '+(settings.name||'HUỲNH CẢNH PC')+'!',35,yn+146);
  c.fillStyle='#087cf0';c.textAlign='center';c.font='bold 25px Arial';c.fillText((settings.name||'HUỲNH CẢNH PC')+'  –  Zalo: '+(settings.phone||'Chưa cập nhật'),W/2,yn+205);
- const a=canvas.toDataURL('image/jpeg',.94);const link=document.createElement('a');link.href=a;link.download=(q.quoteNo||'Bao_gia_Huynh_Canh_PC')+'.jpg';link.click();
+ const fileName=(q.quoteNo||'Bao_gia_Huynh_Canh_PC')+'.jpg';
+ // iOS Safari does not reliably honor <a download> for canvas data URLs.
+ // Export a Blob and offer the native share sheet so the user can choose Save Image.
+ canvas.toBlob(async (blob)=>{
+  if(!blob){alert('Không thể tạo ảnh JPG. Vui lòng thử lại hoặc dùng Safari phiên bản mới.');return;}
+  const file=new File([blob],fileName,{type:'image/jpeg'});
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  if(isIOS && navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))){
+   try{await navigator.share({files:[file],title:fileName});}
+   catch(err){if(err.name!=='AbortError') openJpgInTab(blob);}
+   return;
+  }
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');link.href=url;link.download=fileName;document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),10000);
+ },'image/jpeg',.94);
+}
+function openJpgInTab(blob){
+ const url=URL.createObjectURL(blob);const win=window.open(url,'_blank');
+ if(!win){alert('Safari đã chặn cửa sổ ảnh. Hãy cho phép mở cửa sổ bật lên rồi thử lại.');URL.revokeObjectURL(url);return;}
+ setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
 async function loadCloudData(){
  // Preserve legacy local-only quotes and upload missing IDs as owned by the first signed-in user.
@@ -350,8 +409,37 @@ async function loadCloudData(){
  const {data:store,error:se}=await sb.from('hcpc_store_settings').select('id,data').limit(1).maybeSingle();
  if(se) throw se;
  if(store?.id) cloudStoreId=store.id;
- if(store?.data){settings=store.data;localStorage.setItem('hcpc_settings',JSON.stringify(settings));applySettings();}
+ if(store?.data){settings=store.data;lastCloudSettingsAt=store.updated_at||null;localStorage.setItem('hcpc_settings',JSON.stringify(settings));applySettings();}
 }
+let syncTimer=null,syncBusy=false;
+async function refreshCloudQuotes(showError=false){
+ if(!currentUser||syncBusy)return;
+ syncBusy=true;
+ try{
+  const {data:quotes,error}=await sb.from('hcpc_quotes')
+   .select('local_id,data,created_by,updated_at')
+   .order('updated_at',{ascending:false}).limit(500);
+  if(error)throw error;
+  const fresh=(quotes||[]).map(r=>({...((r.data&&typeof r.data==='object')?r.data:{}),id:String(r.local_id),owner_id:r.created_by,cloud_updated_at:r.updated_at}));
+  historyData=fresh;
+  localStorage.setItem('hcpc_history',JSON.stringify(historyData));
+  renderHistory();
+  await refreshCloudSettings();
+  const status=$('syncStatus');if(status){status.textContent='● Đã đồng bộ '+new Date().toLocaleTimeString('vi-VN');status.style.color='#16834b'}
+ }catch(err){
+  const status=$('syncStatus');if(status){status.textContent='● Lỗi đồng bộ';status.style.color='#c93535'}
+  if(showError)alert('Không tải được báo giá từ máy chủ: '+err.message);
+ }finally{syncBusy=false}
+}
+function startAutoSync(){
+ stopAutoSync();
+ // Polling keeps ADMIN and SALE in sync even when Supabase Realtime is not enabled.
+ syncTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshCloudQuotes(false)},10000);
+}
+function stopAutoSync(){if(syncTimer){clearInterval(syncTimer);syncTimer=null}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&currentUser)refreshCloudQuotes(false)});
+window.addEventListener('focus',()=>{if(currentUser)refreshCloudQuotes(false)});
+
 async function bootAuth(){
  $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();$('authMessage').textContent='Đang đăng nhập...';
@@ -364,7 +452,7 @@ async function bootAuth(){
  if('serviceWorker' in navigator && location.protocol!=='file:'){navigator.serviceWorker.register('./sw.js').catch(()=>{})}
 }
 async function handleSession(session){
- if(!session){currentUser=null;currentProfile=null;$('authGate').classList.remove('hidden');$('userBar').classList.add('hidden');$('adminPanel').classList.add('hidden');$('authMessage').textContent='';return}
+ if(!session){stopAutoSync();currentUser=null;currentProfile=null;$('authGate').classList.remove('hidden');$('userBar').classList.add('hidden');$('adminPanel').classList.add('hidden');$('authMessage').textContent='';return}
  currentUser=session.user;
  const {data:profile,error}=await sb.from('hcpc_profiles').select('email,full_name,role,active').eq('id',currentUser.id).single();
  if(error||!profile||!profile.active){await sb.auth.signOut();$('authMessage').textContent='Tài khoản chưa được cấp quyền hoặc đã bị khóa.';return}
@@ -374,12 +462,12 @@ async function handleSession(session){
  $('signedRole').textContent='· '+(profile.role==='admin'?'ADMIN':'SALE');
  $('adminToggle').classList.toggle('hidden',profile.role!=='admin');$('settingsBtn').classList.toggle('hidden',profile.role!=='admin');
  $('adminPanel').classList.add('hidden');
- try{await loadCloudData();cloudReady=true}catch(err){alert('Đăng nhập thành công nhưng tải dữ liệu lỗi: '+err.message)}
+ try{await loadCloudData();cloudReady=true;startAutoSync()}catch(err){alert('Đăng nhập thành công nhưng tải dữ liệu lỗi: '+err.message)}
  applySettings();$('quoteDate').value=today();$('preparedBy').value=profile.full_name||settings.contact||'';
  if(!$('partsBody').children.length)addRow();
  renderHistory();updateValid();
 }
-async function signOut(){await sb.auth.signOut()}
+async function signOut(){stopAutoSync();await sb.auth.signOut()}
 function toggleAdminPanel(){$('adminPanel').classList.toggle('hidden');if(!$('adminPanel').classList.contains('hidden'))loadSaleUsers()}
 async function createSale(){
  const email=$('newSaleEmail').value.trim(),password=$('newSalePassword').value,full_name=$('newSaleName').value.trim();
@@ -398,7 +486,7 @@ async function setSaleActive(id,active){
  if(error){alert(error.message);return}loadSaleUsers();
 }
 async function init(){
- applySettings();$('quoteDate').value=today();$('preparedBy').value=settings.contact||'';
+ applySettings();bindSettingsAutoSave();$('quoteDate').value=today();$('preparedBy').value=settings.contact||'';
  addRow();renderHistory();updateValid();await bootAuth();
 }
 init();
