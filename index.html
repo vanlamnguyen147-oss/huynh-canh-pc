@@ -114,6 +114,7 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
   <button onclick="exportJPG()">🖼 Xuất ảnh JPG</button>
   <button onclick="window.print()" class="dark">🖨 In báo giá A4</button>
   <button onclick="newQuote()" class="secondary">＋ Báo giá mới</button>
+  <button id="configVaultBtn" onclick="toggleConfigPanel()" class="secondary" aria-expanded="false">🖥️ Kho cấu hình PC</button>
   <button id="partsVaultBtn" onclick="togglePartsVault()" class="secondary" aria-expanded="false">🧩 Kho linh kiện</button>
   <button id="settingsBtn" onclick="toggleSettings()" class="secondary">⚙ Thông tin cửa hàng</button>
  </div>
@@ -381,6 +382,14 @@ async function deletePcConfig(id){
 }
 
 
+function toggleConfigPanel(){
+ const panel=$('configPanel'),btn=$('configVaultBtn');
+ const opening=panel.classList.contains('hidden');
+ panel.classList.toggle('hidden');
+ btn.setAttribute('aria-expanded',String(opening));
+ btn.textContent=opening?'🖥️ Đóng kho cấu hình':'🖥️ Kho cấu hình PC';
+ if(opening){loadPcConfigs();panel.scrollIntoView({behavior:'smooth',block:'start'});}
+}
 function togglePartsVault(){
  const panel=$('partsVault'),btn=$('partsVaultBtn');
  const opening=panel.classList.contains('hidden');
@@ -609,6 +618,7 @@ async function loadCloudData(){
  historyData=(quotes||[]).map(r=>({...((r.data&&typeof r.data==='object')?r.data:{}),id:r.local_id,owner_id:r.created_by,cloud_updated_at:r.updated_at}));
  localStorage.setItem('hcpc_history',JSON.stringify(historyData));renderHistory();
  await loadPcConfigs();
+ await loadVaultParts();
  const {data:store,error:se}=await sb.from('hcpc_store_settings').select('id,data').limit(1).maybeSingle();
  if(se) throw se;
  if(store?.id) cloudStoreId=store.id;
