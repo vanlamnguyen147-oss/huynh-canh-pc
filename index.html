@@ -39,6 +39,7 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
 .history-list{display:grid;gap:8px}.history-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:9px}.history-item strong{display:block}.history-item small{color:var(--muted)}
 .empty{color:#758195;text-align:center;padding:15px}
 .hidden{display:none!important}.hint{font-size:12px;color:#6a7483;margin-top:7px}
+@media(max-width:760px){#partsVault .grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}#partsVault .field[style*="span 2"]{grid-column:span 2!important}
 @media(max-width:760px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.wrap{padding:0 9px}.card{padding:12px}.mark{width:58px;font-size:26px}.history-item{align-items:flex-start;flex-direction:column}.toolbar button{flex:1}}
 @media(max-width:420px){.grid{grid-template-columns:1fr 1fr}.brand p{font-size:12px}.brand h1{font-size:18px}}
 @media print{
@@ -113,7 +114,7 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
   <button onclick="exportJPG()">🖼 Xuất ảnh JPG</button>
   <button onclick="window.print()" class="dark">🖨 In báo giá A4</button>
   <button onclick="newQuote()" class="secondary">＋ Báo giá mới</button>
-  <button id="configToggleBtn" onclick="toggleConfigPanel()" class="secondary" aria-expanded="false">📦 Kho cấu hình</button>
+  <button id="partsVaultBtn" onclick="togglePartsVault()" class="secondary" aria-expanded="false">🧩 Kho linh kiện</button>
   <button id="settingsBtn" onclick="toggleSettings()" class="secondary">⚙ Thông tin cửa hàng</button>
  </div>
 
@@ -125,6 +126,23 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
   </div>
   <div class="hint">ADMIN và SALE đều có thể lưu cấu hình. Cấu hình đã lưu sẽ được chia sẻ cho tất cả tài khoản nhân viên.</div>
   <div id="configList" class="history-list" style="margin-top:10px"><div class="empty">Đang tải kho cấu hình…</div></div>
+ </section>
+
+ <section id="partsVault" class="card no-print hidden">
+  <h2>🧩 Kho linh kiện dùng chung</h2>
+  <div class="grid" style="grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:10px">
+   <div class="field"><label>NHÓM LINH KIỆN</label><input id="vaultCategory" placeholder="CPU / MAIN / RAM..."></div>
+   <div class="field" style="grid-column:span 2"><label>TÊN LINH KIỆN / MODEL</label><input id="vaultName" placeholder="Ví dụ: Intel Core i5 14400F"></div>
+   <div class="field"><label>BẢO HÀNH</label><input id="vaultWarranty" placeholder="36T"></div>
+   <div class="field"><label>GIÁ BÁN (VNĐ)</label><input id="vaultPrice" type="number" min="0" step="1000" placeholder="0"></div>
+  </div>
+  <div class="toolbar" style="margin:0 0 10px">
+   <button class="green" onclick="saveVaultPart()">💾 Lưu linh kiện</button>
+   <button class="secondary" onclick="clearVaultForm()">＋ Nhập mới</button>
+  </div>
+  <p class="hint">Linh kiện được lưu trên Supabase và dùng chung cho ADMIN / SALE. Nhấn “Thêm vào báo giá” để đưa linh kiện vào bảng hiện tại.</p>
+  <div id="partsVaultList" class="history-list" style="margin-top:10px"><div class="empty">Đang tải kho linh kiện…</div></div>
+  <datalist id="vaultPartSuggestions"></datalist>
  </section>
 
  <section id="settings" class="card no-print hidden">
@@ -198,7 +216,9 @@ let editingQuoteId=null;
 let historyData=JSON.parse(localStorage.getItem('hcpc_history')||'[]');
 let settings=JSON.parse(localStorage.getItem('hcpc_settings')||'{}');
 let settingsSaveTimer=null,settingsSaving=false,lastCloudSettingsAt=null;
-let pcConfigs=[];let configSyncBusy=false;
+let pcConfigs=[];
+let vaultParts=[];
+let editingVaultPartId=null;let configSyncBusy=false;
 function applySettings(fillForm=true){
  if(fillForm){$('shopName').value=settings.name||'HUỲNH CẢNH PC';$('shopAddress').value=settings.address||'';
  $('shopPhone').value=settings.phone||'';$('shopContact').value=settings.contact||'';}
@@ -255,25 +275,23 @@ async function refreshCloudSettings(){
  }
 }
 function toggleSettings(){$('settings').classList.toggle('hidden')}
-function toggleConfigPanel(){
- const panel=$('configPanel'),btn=$('configToggleBtn');
- const opening=panel.classList.contains('hidden');
- panel.classList.toggle('hidden',!opening);
- btn.setAttribute('aria-expanded',String(opening));
- btn.textContent=opening?'📦 Đóng kho cấu hình':'📦 Kho cấu hình';
- if(opening)panel.scrollIntoView({behavior:'smooth',block:'start'});
-}
 function addRow(item={}){
  const tr=document.createElement('tr');const idx=rows.length;
  tr.innerHTML=`<td class="stt"></td>
  <td><input class="category" placeholder="CPU" value="${esc(item.category||'')}"></td>
- <td><input class="name" placeholder="Tên linh kiện / model" value="${esc(item.name||'')}"></td>
+ <td><input class="name" list="vaultPartSuggestions" autocomplete="off" placeholder="Nhập tên để tìm linh kiện..." value="${esc(item.name||'')}"></td>
  <td><input class="warranty" placeholder="36T" value="${esc(item.warranty||'')}"></td>
  <td><input class="qty" type="number" min="0" step="1" value="${item.qty??1}"></td>
  <td><input class="price money" inputmode="numeric" placeholder="0" value="${item.price??''}"></td>
  <td class="total">0</td><td class="no-print hide-print"><button class="rowdel" onclick="removeRow(this)">✕</button></td>`;
  $('partsBody').appendChild(tr);
  tr.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>{calc();}));
+ tr.querySelector('.category').addEventListener('input',()=>filterVaultSuggestionsFromRow(tr));
+ tr.querySelector('.name').addEventListener('focus',()=>filterVaultSuggestionsFromRow(tr));
+ tr.querySelector('.name').addEventListener('change',e=>applyVaultSelection(e.target));
+ tr.querySelector('.name').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();applyVaultSelection(e.target);}
+ });
  calc();
 }
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -329,7 +347,7 @@ async function loadPcConfigs(showError=false){
  try{
   const {data,error}=await sb.from('hcpc_pc_configs').select('local_id,name,data,created_by,updated_at').order('updated_at',{ascending:false}).limit(500);
   if(error)throw error;
-  pcConfigs=(data||[]);
+  pcConfigs=(data||[]).filter(x=>!String(x.local_id||'').startsWith('part-'));
   renderPcConfigs();
  }catch(err){
   $('configList').innerHTML='<div class="empty">Không tải được kho cấu hình: '+esc(err.message)+'</div>';
@@ -359,6 +377,109 @@ async function deletePcConfig(id){
  const {error}=await sb.from('hcpc_pc_configs').delete().eq('local_id',String(id));
  if(error){alert('Không xóa được cấu hình: '+error.message);return}
  await loadPcConfigs();
+  await loadVaultParts();
+}
+
+
+function togglePartsVault(){
+ const panel=$('partsVault'),btn=$('partsVaultBtn');
+ const opening=panel.classList.contains('hidden');
+ panel.classList.toggle('hidden');
+ btn.setAttribute('aria-expanded',String(opening));
+ btn.textContent=opening?'🧩 Đóng kho linh kiện':'🧩 Kho linh kiện';
+ if(opening){loadVaultParts();panel.scrollIntoView({behavior:'smooth',block:'start'});}
+}
+function clearVaultForm(){
+ editingVaultPartId=null;
+ ['vaultCategory','vaultName','vaultWarranty','vaultPrice'].forEach(id=>$(id).value='');
+}
+async function loadVaultParts(showError=false){
+ if(!currentUser)return;
+ try{
+  const {data,error}=await sb.from('hcpc_pc_configs').select('local_id,name,data,created_by,updated_at').like('local_id','part-%').order('updated_at',{ascending:false}).limit(1000);
+  if(error)throw error;
+  vaultParts=data||[];
+  renderVaultParts();
+  renderVaultSuggestions();
+ }catch(err){
+  $('partsVaultList').innerHTML='<div class="empty">Không tải được kho linh kiện: '+esc(err.message)+'</div>';
+  if(showError)alert('Lỗi tải kho linh kiện: '+err.message);
+ }
+}
+
+function renderVaultSuggestions(category=''){
+ const dl=$('vaultPartSuggestions');
+ if(!dl)return;
+ const key=String(category||'').trim().toLocaleLowerCase('vi');
+ const matches=vaultParts.filter(p=>{
+  const d=p.data?.part||{};
+  const cat=String(d.category||'').trim().toLocaleLowerCase('vi');
+  return !key || cat.includes(key);
+ });
+ dl.innerHTML=matches.map(p=>{
+  const d=p.data?.part||{};
+  const label=d.name||p.name||'';
+  return label?`<option value="${esc(label)}">${esc((d.category||'LINH KIỆN')+' · '+(d.warranty||'')+' · '+money(Number(d.price)||0)+' đ')}</option>`:'';
+ }).join('');
+}
+function filterVaultSuggestionsFromRow(row){
+ const category=row?.querySelector('.category')?.value||'';
+ renderVaultSuggestions(category);
+}
+function applyVaultSelection(input){
+ const selected=String(input.value||'').trim().toLocaleLowerCase('vi');
+ if(!selected)return;
+ const p=vaultParts.find(x=>{
+  const d=x.data?.part||{};
+  return String(d.name||x.name||'').trim().toLocaleLowerCase('vi')===selected;
+ });
+ if(!p)return;
+ const d=p.data?.part||{};
+ const row=input.closest('tr');
+ if(!row)return;
+ row.querySelector('.category').value=d.category||'';
+ row.querySelector('.warranty').value=d.warranty||'';
+ row.querySelector('.price').value=Number(d.price)||0;
+ calc();
+}
+function renderVaultParts(){
+ const el=$('partsVaultList');
+ if(!vaultParts.length){el.innerHTML='<div class="empty">Kho chưa có linh kiện. Hãy nhập thông tin phía trên rồi nhấn “Lưu linh kiện”.</div>';return;}
+ el.innerHTML=vaultParts.map(p=>{
+  const d=p.data?.part||{};
+  return `<div class="history-item"><div><strong>${esc(d.category||'LINH KIỆN')} · ${esc(d.name||p.name||'')}</strong><small>BH: ${esc(d.warranty||'Chưa ghi')} · ${money(Number(d.price)||0)} đ</small></div><div class="toolbar" style="margin:0"><button class="green" onclick="useVaultPart('${esc(p.local_id)}')">＋ Thêm vào báo giá</button><button class="secondary" onclick="editVaultPart('${esc(p.local_id)}')">Sửa</button><button class="danger" onclick="deleteVaultPart('${esc(p.local_id)}')">Xóa</button></div></div>`;
+ }).join('');
+}
+async function saveVaultPart(){
+ if(!currentUser){alert('Bạn cần đăng nhập trước.');return;}
+ const part={category:$('vaultCategory').value.trim(),name:$('vaultName').value.trim(),warranty:$('vaultWarranty').value.trim(),price:Number($('vaultPrice').value)||0};
+ if(!part.category||!part.name){alert('Vui lòng nhập nhóm linh kiện và tên / model.');return;}
+ const localId=editingVaultPartId||('part-'+Date.now()+'-'+Math.random().toString(36).slice(2,8));
+ const existing=vaultParts.find(x=>String(x.local_id)===String(localId));
+ const payload={local_id:localId,name:part.name,data:{type:'part',part},created_by:existing?.created_by||currentUser.id,updated_at:new Date().toISOString()};
+ const {error}=await sb.from('hcpc_pc_configs').upsert(payload,{onConflict:'local_id'});
+ if(error){alert('Không lưu được linh kiện: '+error.message);return;}
+ clearVaultForm();await loadVaultParts();alert('Đã lưu linh kiện vào kho dùng chung.');
+}
+function editVaultPart(id){
+ const p=vaultParts.find(x=>String(x.local_id)===String(id));if(!p)return;
+ const d=p.data?.part||{};
+ editingVaultPartId=String(id);
+ $('vaultCategory').value=d.category||'';$('vaultName').value=d.name||p.name||'';
+ $('vaultWarranty').value=d.warranty||'';$('vaultPrice').value=Number(d.price)||0;
+ $('partsVault').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function useVaultPart(id){
+ const p=vaultParts.find(x=>String(x.local_id)===String(id));if(!p)return;
+ const d=p.data?.part||{};
+ addRow({category:d.category||'',name:d.name||p.name||'',warranty:d.warranty||'',qty:1,price:Number(d.price)||0});
+ document.querySelector('#partsBody tr:last-child .name')?.focus();
+}
+async function deleteVaultPart(id){
+ if(!confirm('Xóa linh kiện này khỏi kho dùng chung?'))return;
+ const {error}=await sb.from('hcpc_pc_configs').delete().eq('local_id',String(id));
+ if(error){alert('Không xóa được linh kiện: '+error.message);return;}
+ await loadVaultParts();
 }
 
 function formData(){
