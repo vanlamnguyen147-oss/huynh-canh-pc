@@ -115,6 +115,17 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
   <button onclick="newQuote()" class="secondary">＋ Báo giá mới</button>
   <button id="settingsBtn" onclick="toggleSettings()" class="secondary">⚙ Thông tin cửa hàng</button>
  </div>
+
+ <section id="configPanel" class="card no-print">
+  <h2>🖥️ Kho cấu hình PC dùng chung</h2>
+  <div class="grid" style="grid-template-columns:2fr 1fr;margin-bottom:10px">
+   <div class="field"><label>TÊN CẤU HÌNH</label><input id="configName" placeholder="Ví dụ: PC Gaming i5 RTX 5060"></div>
+   <div class="field" style="justify-content:end"><button class="green" onclick="savePcConfig()">💾 Lưu cấu hình đang nhập</button></div>
+  </div>
+  <div class="hint">ADMIN và SALE đều có thể lưu cấu hình. Cấu hình đã lưu sẽ được chia sẻ cho tất cả tài khoản nhân viên.</div>
+  <div id="configList" class="history-list" style="margin-top:10px"><div class="empty">Đang tải kho cấu hình…</div></div>
+ </section>
+
  <section id="settings" class="card no-print hidden">
   <h2>Thông tin cửa hàng</h2>
   <div class="grid">
@@ -186,6 +197,7 @@ let editingQuoteId=null;
 let historyData=JSON.parse(localStorage.getItem('hcpc_history')||'[]');
 let settings=JSON.parse(localStorage.getItem('hcpc_settings')||'{}');
 let settingsSaveTimer=null,settingsSaving=false,lastCloudSettingsAt=null;
+let pcConfigs=[];let configSyncBusy=false;
 function applySettings(fillForm=true){
  if(fillForm){$('shopName').value=settings.name||'HUỲNH CẢNH PC';$('shopAddress').value=settings.address||'';
  $('shopPhone').value=settings.phone||'';$('shopContact').value=settings.contact||'';}
@@ -285,6 +297,61 @@ function addSample(){
  ];
  sample.forEach(x=>addRow({category:x[0],name:x[1],warranty:x[2],qty:x[3],price:x[4]}));calc();
 }
+
+function configRowsFromQuote(){return getRows().map(r=>({...r}));}
+async function savePcConfig(){
+ if(!currentUser){alert('Bạn cần đăng nhập trước.');return}
+ const name=$('configName').value.trim();
+ const configRows=configRowsFromQuote();
+ if(!name){alert('Vui lòng nhập tên cấu hình.');$('configName').focus();return}
+ if(!configRows.length||!configRows.some(r=>r.category||r.name)){alert('Vui lòng nhập linh kiện trước khi lưu cấu hình.');return}
+ const existing=pcConfigs.find(x=>x.name.toLowerCase()===name.toLowerCase());
+ const localId=existing?String(existing.local_id):('cfg-'+Date.now()+'-'+Math.random().toString(36).slice(2,8));
+ const payload={local_id:localId,name,data:{name,rows:configRows},created_by:existing?.created_by||currentUser.id,updated_at:new Date().toISOString()};
+ const {error}=await sb.from('hcpc_pc_configs').upsert(payload,{onConflict:'local_id'});
+ if(error){alert('Không lưu được cấu hình lên máy chủ: '+error.message);return}
+ $('configName').value='';
+ await loadPcConfigs(true);
+ alert('Đã lưu cấu hình dùng chung: '+name);
+}
+async function loadPcConfigs(showError=false){
+ if(!currentUser||configSyncBusy)return;
+ configSyncBusy=true;
+ try{
+  const {data,error}=await sb.from('hcpc_pc_configs').select('local_id,name,data,created_by,updated_at').order('updated_at',{ascending:false}).limit(500);
+  if(error)throw error;
+  pcConfigs=(data||[]);
+  renderPcConfigs();
+ }catch(err){
+  $('configList').innerHTML='<div class="empty">Không tải được kho cấu hình: '+esc(err.message)+'</div>';
+  if(showError)alert('Lỗi tải cấu hình: '+err.message);
+ }finally{configSyncBusy=false}
+}
+function renderPcConfigs(){
+ const el=$('configList');
+ if(!pcConfigs.length){el.innerHTML='<div class="empty">Chưa có cấu hình PC nào. Hãy nhập linh kiện rồi nhấn “Lưu cấu hình đang nhập”.</div>';return}
+ el.innerHTML=pcConfigs.map(c=>{
+  const rows=(c.data&&Array.isArray(c.data.rows))?c.data.rows:[];
+  const desc=rows.map(r=>[r.category,r.name].filter(Boolean).join(': ')).filter(Boolean).slice(0,4).join(' · ');
+  return `<div class="history-item"><div><strong>${esc(c.name||'Cấu hình PC')}</strong><small>${esc(desc||'Chưa có mô tả linh kiện')} · ${rows.length} linh kiện</small></div><div class="toolbar" style="margin:0"><button class="secondary" onclick="usePcConfig('${esc(c.local_id)}')">Sử dụng</button><button class="danger" onclick="deletePcConfig('${esc(c.local_id)}')">Xóa</button></div></div>`;
+ }).join('');
+}
+function usePcConfig(id){
+ const c=pcConfigs.find(x=>String(x.local_id)===String(id));if(!c)return;
+ if(!confirm('Nạp cấu hình "'+(c.name||'')+'" vào bảng báo giá hiện tại?'))return;
+ $('partsBody').innerHTML='';
+ (c.data?.rows||[]).forEach(r=>addRow(r));
+ if(!$('partsBody').children.length)addRow();
+ calc();$('configName').value=c.name||'';
+ window.scrollTo({top:0,behavior:'smooth'});
+}
+async function deletePcConfig(id){
+ if(!confirm('Xóa cấu hình này khỏi kho dùng chung?'))return;
+ const {error}=await sb.from('hcpc_pc_configs').delete().eq('local_id',String(id));
+ if(error){alert('Không xóa được cấu hình: '+error.message);return}
+ await loadPcConfigs();
+}
+
 function formData(){
  return {id:(editingQuoteId||Date.now().toString()),quoteNo:$('quoteNo').value,quoteDate:$('quoteDate').value,validHours:$('validHours').value,
  preparedBy:$('preparedBy').value,customer:$('customer').value,customerInfo:$('customerInfo').value,
@@ -297,17 +364,22 @@ function fillForm(q){
  $('partsBody').innerHTML='';(q.rows||[]).forEach(addRow);if(!q.rows?.length)addRow();updateValid();calc();
 }
 async function saveQuote(){
- const q=formData();if(!q.quoteNo)q.quoteNo='HC-'+new Date().toISOString().replace(/[-:T.Z]/g,'').slice(0,12);
- $('quoteNo').value=q.quoteNo;
- editingQuoteId=String(q.id);const old=historyData.findIndex(x=>String(x.id)===String(q.id));
- if(old>=0) historyData.splice(old,1);
- historyData.unshift(q);historyData=historyData.slice(0,100);
- localStorage.setItem('hcpc_history',JSON.stringify(historyData));renderHistory();
  if(!currentUser){alert('Bạn chưa đăng nhập.');return}
- const payload={local_id:String(q.id),data:q,customer_name:q.customer||'',quote_no:q.quoteNo,total:q.total,created_by:currentUser.id,updated_at:new Date().toISOString()};
+ const q=formData();
+ if(!q.quoteNo)q.quoteNo='HC-'+new Date().toISOString().replace(/[-:T.Z]/g,'').slice(0,12);
+ $('quoteNo').value=q.quoteNo;
+ q.savedAt=new Date().toISOString();
+ const localId=String(q.id);
+ let originalCreator=currentUser.id;
+ const {data:existing,error:lookupError}=await sb.from('hcpc_quotes').select('created_by').eq('local_id',localId).maybeSingle();
+ if(lookupError){alert('Không kiểm tra được báo giá cũ: '+lookupError.message);return}
+ if(existing?.created_by)originalCreator=existing.created_by;
+ const payload={local_id:localId,data:q,customer_name:q.customer||'',quote_no:q.quoteNo,total:q.total,created_by:originalCreator,updated_at:new Date().toISOString()};
  const {error}=await sb.from('hcpc_quotes').upsert(payload,{onConflict:'local_id'});
- if(error){alert('Đã lưu trên thiết bị nhưng chưa đồng bộ Supabase: '+error.message);return}
- await refreshCloudQuotes(false);alert('Đã lưu và đồng bộ báo giá '+q.quoteNo+'.');
+ if(error){alert('Không lưu được báo giá lên máy chủ: '+error.message);return}
+ editingQuoteId=localId;
+ await refreshCloudQuotes(false);
+ alert('Đã lưu và đồng bộ báo giá '+q.quoteNo+'.');
 }
 
 function renderHistory(){
@@ -406,6 +478,7 @@ async function loadCloudData(){
  if(error) throw error;
  historyData=(quotes||[]).map(r=>({...((r.data&&typeof r.data==='object')?r.data:{}),id:r.local_id,owner_id:r.created_by,cloud_updated_at:r.updated_at}));
  localStorage.setItem('hcpc_history',JSON.stringify(historyData));renderHistory();
+ await loadPcConfigs();
  const {data:store,error:se}=await sb.from('hcpc_store_settings').select('id,data').limit(1).maybeSingle();
  if(se) throw se;
  if(store?.id) cloudStoreId=store.id;
@@ -424,6 +497,7 @@ async function refreshCloudQuotes(showError=false){
   historyData=fresh;
   localStorage.setItem('hcpc_history',JSON.stringify(historyData));
   renderHistory();
+  await loadPcConfigs();
   await refreshCloudSettings();
   const status=$('syncStatus');if(status){status.textContent='● Đã đồng bộ '+new Date().toLocaleTimeString('vi-VN');status.style.color='#16834b'}
  }catch(err){
