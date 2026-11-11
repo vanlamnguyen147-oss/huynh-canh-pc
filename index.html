@@ -113,10 +113,11 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
   <button onclick="exportJPG()">🖼 Xuất ảnh JPG</button>
   <button onclick="window.print()" class="dark">🖨 In báo giá A4</button>
   <button onclick="newQuote()" class="secondary">＋ Báo giá mới</button>
+  <button id="configToggleBtn" onclick="toggleConfigPanel()" class="secondary" aria-expanded="false">📦 Kho cấu hình</button>
   <button id="settingsBtn" onclick="toggleSettings()" class="secondary">⚙ Thông tin cửa hàng</button>
  </div>
 
- <section id="configPanel" class="card no-print">
+ <section id="configPanel" class="card no-print hidden">
   <h2>🖥️ Kho cấu hình PC dùng chung</h2>
   <div class="grid" style="grid-template-columns:2fr 1fr;margin-bottom:10px">
    <div class="field"><label>TÊN CẤU HÌNH</label><input id="configName" placeholder="Ví dụ: PC Gaming i5 RTX 5060"></div>
@@ -254,6 +255,14 @@ async function refreshCloudSettings(){
  }
 }
 function toggleSettings(){$('settings').classList.toggle('hidden')}
+function toggleConfigPanel(){
+ const panel=$('configPanel'),btn=$('configToggleBtn');
+ const opening=panel.classList.contains('hidden');
+ panel.classList.toggle('hidden',!opening);
+ btn.setAttribute('aria-expanded',String(opening));
+ btn.textContent=opening?'📦 Đóng kho cấu hình':'📦 Kho cấu hình';
+ if(opening)panel.scrollIntoView({behavior:'smooth',block:'start'});
+}
 function addRow(item={}){
  const tr=document.createElement('tr');const idx=rows.length;
  tr.innerHTML=`<td class="stt"></td>
