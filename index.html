@@ -114,6 +114,7 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
   <button onclick="exportJPG()">🖼 Xuất ảnh JPG</button>
   <button onclick="window.print()" class="dark">🖨 In báo giá A4</button>
   <button onclick="newQuote()" class="secondary">＋ Báo giá mới</button>
+  <button id="installmentBtn" onclick="toggleInstallment()" class="secondary no-print">💳 GÓP</button>
   <button id="configVaultBtn" onclick="toggleConfigPanel()" class="secondary" aria-expanded="false">🖥️ Kho cấu hình PC</button>
   <button id="partsVaultBtn" onclick="togglePartsVault()" class="secondary" aria-expanded="false">🧩 Kho linh kiện</button>
   <button id="settingsBtn" onclick="toggleSettings()" class="secondary">⚙ Thông tin cửa hàng</button>
@@ -181,9 +182,31 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
   <div class="toolbar no-print" style="margin-top:10px">
    <button onclick="addRow()" class="secondary">＋ Thêm linh kiện</button>
    <button onclick="addSample()" class="secondary">Nạp cấu hình mẫu</button>
+   
   </div>
   <div class="totalbar"><div class="label">TỔNG GIÁ TRỊ BÁO GIÁ</div><div class="amount" id="grandTotal">0 đ</div></div>
-  <div class="notes">
+  <section id="installmentPanel" class="card no-print hidden" style="margin-top:14px">
+   <div class="toolbar" style="justify-content:space-between">
+    <h2 style="margin:0">💳 TÍNH TRẢ GÓP HD SAISON</h2>
+    <button class="secondary" onclick="toggleInstallment()">Đóng</button>
+   </div>
+   <div class="grid" style="margin-top:12px">
+    <div class="field"><label>GIÁ SẢN PHẨM (VNĐ)</label><input id="instPrice" type="number" min="0" step="1000"></div>
+    <div class="field"><label>TRẢ TRƯỚC (%)</label><input id="instDownPercent" type="number" min="0" max="100" step="1" value="20"></div>
+    <div class="field"><label>TRẢ TRƯỚC (VNĐ)</label><input id="instDownAmount" type="number" min="0" step="1000"></div>
+    <div class="field"><label>SỐ TIỀN VAY (VNĐ)</label><input id="instLoan" type="text" readonly></div>
+   </div>
+   <div class="toolbar" style="margin:10px 0">
+    <button class="green" onclick="calculateInstallment()">Tính tiền góp</button>
+    <button class="secondary" onclick="useQuotePriceForInstallment()">Lấy giá từ báo giá</button>
+    <button class="secondary" onclick="exportInstallmentJPG()">🖼️ Xuất JPG</button>
+   </div>
+   <div id="installmentResults" class="history-list">
+    <div class="empty">Nhập giá sản phẩm rồi nhấn “Tính tiền góp”.</div>
+   </div>
+   <p class="hint">Công thức theo file Excel WBW: 9 tháng dùng 2,5% + 0,52%/tháng; 12 và 15 tháng dùng 2,16% + 0,52%/tháng; cộng 12.000đ/tháng. Trả trước mặc định 20%. Kết quả tham khảo theo bảng tính, cần xác nhận lại với HD SAISON khi làm hồ sơ.</p>
+  </section>
+ <div class="notes">
    <h3>THÔNG TIN & LƯU Ý</h3>
    <ul>
     <li>Giá có hiệu lực trong <span id="noteHours">12</span> giờ kể từ thời điểm gửi báo giá.</li>
@@ -491,6 +514,116 @@ async function deleteVaultPart(id){
  await loadVaultParts();
 }
 
+
+function toggleInstallment(){
+ const panel=$('installmentPanel'),btn=$('installmentBtn');
+ const opening=panel.classList.contains('hidden');
+ panel.classList.toggle('hidden');
+ if(btn)btn.textContent=opening?'💳 Đóng bảng góp':'💳 GÓP';
+ if(opening){useQuotePriceForInstallment();panel.scrollIntoView({behavior:'smooth',block:'start'});}
+}
+function useQuotePriceForInstallment(){
+ const total=Number(String($('grandTotal')?.textContent||'0').replace(/[^\d]/g,''))||0;
+ $('instPrice').value=total;
+ updateInstallmentDownAmount();
+ calculateInstallment();
+}
+function updateInstallmentDownAmount(){
+ const price=Math.max(0,Number($('instPrice').value)||0);
+ const percent=Math.min(100,Math.max(0,Number($('instDownPercent').value)||0));
+ $('instDownAmount').value=Math.round(price*percent/100);
+}
+function calculateInstallment(){
+ const price=Math.max(0,Number($('instPrice').value)||0);
+ const down=Math.min(price,Math.max(0,Number($('instDownAmount').value)||0));
+ const loan=Math.max(0,price-down);
+ $('instLoan').value=money(loan)+' đ';
+ if(!price){$('installmentResults').innerHTML='<div class="empty">Vui lòng nhập giá sản phẩm.</div>';return;}
+ const plans=[
+  {months:9,rate:0.025},
+  {months:12,rate:0.0216},
+  {months:15,rate:0.0216}
+ ];
+ $('installmentResults').innerHTML=plans.map(plan=>{
+  const monthly=(loan/plan.months)+(loan*plan.rate)+(loan*0.0052)+12000;
+  const rounded=Math.round(monthly);
+  const totalPay=rounded*plan.months;
+  const interest=totalPay-loan;
+  return `<div class="history-item"><div><strong>GÓP ${plan.months} THÁNG</strong><small>Tiền vay: ${money(loan)} đ · Tổng lãi/phí theo bảng: ${money(interest)} đ</small></div><div style="text-align:right"><strong>${money(rounded)} đ / tháng</strong><small>Tổng tiền góp: ${money(totalPay)} đ</small></div></div>`;
+ }).join('');
+}
+
+
+function exportInstallmentJPG(){
+ const price=Math.max(0,Number($('instPrice').value)||0);
+ const down=Math.min(price,Math.max(0,Number($('instDownAmount').value)||0));
+ const percent=price?down/price*100:0;
+ const loan=Math.max(0,price-down);
+ if(!price){alert('Vui lòng nhập giá sản phẩm trước khi xuất JPG.');return;}
+ const plans=[{months:9,rate:0.025},{months:12,rate:0.0216},{months:15,rate:0.0216}];
+ const monthly=plan=>Math.round(((loan/plan.months)+(loan*plan.rate)+(loan*0.0052)+12000)/1000)*1000;
+ const fmt=n=>new Intl.NumberFormat('vi-VN').format(Math.round(n));
+ const canvas=document.createElement('canvas');
+ canvas.width=1752;canvas.height=897;
+ const c=canvas.getContext('2d');
+ c.scale(1.8,1.8);
+ c.fillStyle='#fff';c.fillRect(0,0,973.333,498.333);
+ const roundRect=(x,y,w,h,r,color)=>{
+  c.beginPath();c.roundRect(x,y,w,h,r);c.fillStyle=color;c.fill();
+ };
+ // Header banner
+ roundRect(12,10,949,55,15,'#1260b5');
+ c.fillStyle='#fff';c.font='900 25px Arial';c.textAlign='center';
+ c.fillText('BẢNG THANH TOÁN SẢN PHẨM',486.5,47);
+ // Table frame and rows
+ const x=12,y=78,w=949,rowH=43,leftW=493;
+ const labels=[
+  ['🛒','Giá sản phẩm',fmt(price)+'đ','#d9efff'],
+  ['🔴','% Trả trước',percent.toLocaleString('vi-VN',{maximumFractionDigits:2})+'%','#fce9ed'],
+  ['🪙','Trả trước',fmt(down)+'đ','#fce9ed'],
+  ['💰','Vay',fmt(loan)+'đ','#fce9ed'],
+  ['🗓️','9 tháng',fmt(monthly(plans[0]))+'đ/tháng','#fff0d2'],
+  ['🗓️','12 tháng',fmt(monthly(plans[1]))+'đ/tháng','#fff0d2'],
+  ['🗓️','15 tháng',fmt(monthly(plans[2]))+'đ/tháng','#fff0d2'],
+  ['', 'Số tháng góp','Số tiền đóng hàng tháng','#d9efff']
+ ];
+ c.save();
+ c.beginPath();c.roundRect(x,y,w,rowH*8,14);c.clip();
+ labels.forEach((r,i)=>{
+  const yy=y+i*rowH;
+  c.fillStyle=r[3];c.fillRect(x,yy,w,rowH);
+  if(i>0){c.strokeStyle='#17477f';c.lineWidth=1;c.beginPath();c.moveTo(x,yy);c.lineTo(x+w,yy);c.stroke();}
+  c.fillStyle='#10264a';c.textAlign='left';c.font=i===7?'bold 15px Arial':'bold 19px Arial';
+  if(r[0])c.fillText(r[0],x+14,yy+28);
+  c.fillText(r[1],x+(r[0]?58:20),yy+28);
+  c.textAlign='center';c.font=i===7?'bold 14px Arial':'bold 19px Arial';
+  c.fillText(r[2],x+leftW+(w-leftW)/2,yy+28);
+ });
+ c.strokeStyle='#17477f';c.lineWidth=2.5;c.strokeRect(x,y,w,rowH*8);
+ c.beginPath();c.moveTo(x+leftW,y);c.lineTo(x+leftW,y+rowH*8);c.stroke();
+ c.restore();
+ // Procedure footer
+ roundRect(12,432,949,56,15,'#ffcf3e');
+ c.fillStyle='#10264a';c.textAlign='center';c.font='bold 18px Arial';
+ c.fillText('🪪 Thủ tục: CCCD gắn chip – CCCD mới',486.5,467);
+ const fileName='HUYNH-CANH-PC-BANG-THANH-TOAN-1752x897.jpg';
+ canvas.toBlob(async blob=>{
+  if(!blob){alert('Không thể tạo ảnh JPG. Vui lòng thử lại.');return;}
+  const file=new File([blob],fileName,{type:'image/jpeg'});
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  if(isIOS&&navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){
+   try{await navigator.share({files:[file],title:fileName});}catch(err){if(err.name!=='AbortError')openJpgInTab(blob);}
+   return;
+  }
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=fileName;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),10000);
+ },'image/jpeg',.95);
+}
+
+function escapeHtmlPrint(value){
+ return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
 function formData(){
  return {id:(editingQuoteId||Date.now().toString()),quoteNo:$('quoteNo').value,quoteDate:$('quoteDate').value,validHours:$('validHours').value,
  preparedBy:$('preparedBy').value,customer:$('customer').value,customerInfo:$('customerInfo').value,
