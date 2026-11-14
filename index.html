@@ -122,11 +122,15 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
 
  <section id="configPanel" class="card no-print hidden">
   <h2>🖥️ Kho cấu hình PC dùng chung</h2>
-  <div class="grid" style="grid-template-columns:2fr 1fr;margin-bottom:10px">
-   <div class="field"><label>TÊN CẤU HÌNH</label><input id="configName" placeholder="Ví dụ: PC Gaming i5 RTX 5060"></div>
-   <div class="field" style="justify-content:end"><button class="green" onclick="savePcConfig()">💾 Lưu cấu hình đang nhập</button></div>
+  <div id="configAdminTools">
+   <div class="grid" style="grid-template-columns:2fr 1fr;margin-bottom:10px">
+    <div class="field"><label>TÊN CẤU HÌNH</label><input id="configName" placeholder="Ví dụ: PC Gaming i5 RTX 5060"></div>
+    <div class="field" style="justify-content:end"><button id="saveConfigBtn" class="green" onclick="savePcConfig()">💾 Lưu cấu hình đang nhập</button></div>
+   </div>
+   <div class="toolbar" style="margin:0 0 8px"><button id="cancelConfigEditBtn" class="secondary hidden" onclick="cancelEditPcConfig()">Hủy chỉnh sửa</button></div>
+  <div id="configEditHint" class="hint hidden" style="margin:8px 0">✏️ Đang sửa cấu hình mẫu: Bạn có thể thêm linh kiện bằng nút thêm dòng, xóa bằng nút ✕ hoặc thay đổi tên linh kiện, model, bảo hành, số lượng và giá trong bảng báo giá. Sau đó quay lại đây nhấn “Cập nhật cấu hình”.</div>
   </div>
-  <div class="hint">ADMIN và SALE đều có thể lưu cấu hình. Cấu hình đã lưu sẽ được chia sẻ cho tất cả tài khoản nhân viên.</div>
+  <div id="configRoleHint" class="hint">ADMIN được thêm, sửa và xóa cấu hình. SALE chỉ được xem và nạp cấu hình vào báo giá.</div>
   <div id="configList" class="history-list" style="margin-top:10px"><div class="empty">Đang tải kho cấu hình…</div></div>
  </section>
 
@@ -242,7 +246,7 @@ let settings=JSON.parse(localStorage.getItem('hcpc_settings')||'{}');
 let settingsSaveTimer=null,settingsSaving=false,lastCloudSettingsAt=null;
 let pcConfigs=[];
 let vaultParts=[];
-let editingVaultPartId=null;let configSyncBusy=false;
+let editingVaultPartId=null;let configSyncBusy=false;let editingPcConfigId=null;
 function applySettings(fillForm=true){
  if(fillForm){$('shopName').value=settings.name||'HUỲNH CẢNH PC';$('shopAddress').value=settings.address||'';
  $('shopPhone').value=settings.phone||'';$('shopContact').value=settings.contact||'';}
@@ -352,18 +356,34 @@ function addSample(){
 function configRowsFromQuote(){return getRows().map(r=>({...r}));}
 async function savePcConfig(){
  if(!currentUser){alert('Bạn cần đăng nhập trước.');return}
+ if(currentProfile?.role!=='admin'){alert('Chỉ ADMIN mới được thêm hoặc chỉnh sửa cấu hình.');return}
  const name=$('configName').value.trim();
  const configRows=configRowsFromQuote();
  if(!name){alert('Vui lòng nhập tên cấu hình.');$('configName').focus();return}
  if(!configRows.length||!configRows.some(r=>r.category||r.name)){alert('Vui lòng nhập linh kiện trước khi lưu cấu hình.');return}
- const existing=pcConfigs.find(x=>x.name.toLowerCase()===name.toLowerCase());
+ const existing=editingPcConfigId?pcConfigs.find(x=>String(x.local_id)===String(editingPcConfigId)):pcConfigs.find(x=>x.name.toLowerCase()===name.toLowerCase());
  const localId=existing?String(existing.local_id):('cfg-'+Date.now()+'-'+Math.random().toString(36).slice(2,8));
  const payload={local_id:localId,name,data:{name,rows:configRows},created_by:existing?.created_by||currentUser.id,updated_at:new Date().toISOString()};
  const {error}=await sb.from('hcpc_pc_configs').upsert(payload,{onConflict:'local_id'});
  if(error){alert('Không lưu được cấu hình lên máy chủ: '+error.message);return}
- $('configName').value='';
+ cancelEditPcConfig();
  await loadPcConfigs(true);
- alert('Đã lưu cấu hình dùng chung: '+name);
+ alert(existing?'Đã cập nhật cấu hình dùng chung: '+name:'Đã thêm cấu hình dùng chung: '+name);
+}
+function editPcConfig(id){
+ if(currentProfile?.role!=='admin'){alert('Chỉ ADMIN mới được chỉnh sửa cấu hình.');return}
+ const c=pcConfigs.find(x=>String(x.local_id)===String(id));if(!c)return;
+ editingPcConfigId=String(c.local_id);$('configName').value=c.name||'';
+ $('partsBody').innerHTML='';(c.data?.rows||[]).forEach(r=>addRow(r));if(!$('partsBody').children.length)addRow();calc();
+ $('saveConfigBtn').textContent='💾 Cập nhật cấu hình';$('cancelConfigEditBtn').classList.remove('hidden');$('configEditHint').classList.remove('hidden');
+ $('partsBody').scrollIntoView({top:0,behavior:'smooth',block:'center'});
+}
+function cancelEditPcConfig(){
+ editingPcConfigId=null;
+ if($('configName'))$('configName').value='';
+ if($('saveConfigBtn'))$('saveConfigBtn').textContent='💾 Lưu cấu hình đang nhập';
+ if($('cancelConfigEditBtn'))$('cancelConfigEditBtn').classList.add('hidden');
+ if($('configEditHint'))$('configEditHint').classList.add('hidden');
 }
 async function loadPcConfigs(showError=false){
  if(!currentUser||configSyncBusy)return;
@@ -384,7 +404,8 @@ function renderPcConfigs(){
  el.innerHTML=pcConfigs.map(c=>{
   const rows=(c.data&&Array.isArray(c.data.rows))?c.data.rows:[];
   const desc=rows.map(r=>[r.category,r.name].filter(Boolean).join(': ')).filter(Boolean).slice(0,4).join(' · ');
-  return `<div class="history-item"><div><strong>${esc(c.name||'Cấu hình PC')}</strong><small>${esc(desc||'Chưa có mô tả linh kiện')} · ${rows.length} linh kiện</small></div><div class="toolbar" style="margin:0"><button class="secondary" onclick="usePcConfig('${esc(c.local_id)}')">Sử dụng</button><button class="danger" onclick="deletePcConfig('${esc(c.local_id)}')">Xóa</button></div></div>`;
+  const adminActions=currentProfile?.role==='admin'?`<button class="secondary" onclick="editPcConfig('${esc(c.local_id)}')">Sửa</button><button class="danger" onclick="deletePcConfig('${esc(c.local_id)}')">Xóa</button>`:'';
+  return `<div class="history-item"><div><strong>${esc(c.name||'Cấu hình PC')}</strong><small>${esc(desc||'Chưa có mô tả linh kiện')} · ${rows.length} linh kiện</small></div><div class="toolbar" style="margin:0"><button class="secondary" onclick="usePcConfig('${esc(c.local_id)}')">Sử dụng</button>${adminActions}</div></div>`;
  }).join('');
 }
 function usePcConfig(id){
@@ -397,6 +418,7 @@ function usePcConfig(id){
  window.scrollTo({top:0,behavior:'smooth'});
 }
 async function deletePcConfig(id){
+ if(currentProfile?.role!=='admin'){alert('Chỉ ADMIN mới được xóa cấu hình.');return}
  if(!confirm('Xóa cấu hình này khỏi kho dùng chung?'))return;
  const {error}=await sb.from('hcpc_pc_configs').delete().eq('local_id',String(id));
  if(error){alert('Không xóa được cấu hình: '+error.message);return}
@@ -691,15 +713,18 @@ function exportJPG(){
  drawField(22,315,750,'KHÁCH HÀNG',q.customer);drawField(772,315,806,'THÔNG TIN',q.customerInfo);
  const cols=[22,90,280,940,1040,1125,1360,1578];const headers=['STT','LINH KIỆN','CHI TIẾT / MODEL','BH','SL','ĐƠN GIÁ','THÀNH TIỀN'];
  c.fillStyle='#111318';c.fillRect(22,headerY,W-44,48);c.font='bold 19px Arial';c.fillStyle='#fff';c.textAlign='center';
- headers.forEach((h,i)=>c.fillText(h,(cols[i]+cols[i+1])/2,headerY+31));
+ headers.forEach((h,i)=>{
+   c.font='bold 27px Arial';
+   c.fillText(h,(cols[i]+cols[i+1])/2,headerY+31);
+  });
  rows.forEach((r,i)=>{
  const y=headerY+48+i*rowH;c.fillStyle=i%2?'#f2f5f8':'#fff';c.fillRect(22,y,W-44,rowH);c.strokeStyle='#252a32';c.lineWidth=1;c.strokeRect(22,y,W-44,rowH);
  for(let j=1;j<cols.length-1;j++){c.beginPath();c.moveTo(cols[j],y);c.lineTo(cols[j],y+rowH);c.stroke()}
- c.fillStyle='#20242c';c.font='18px Arial';c.textAlign='center';c.fillText(String(i+1),(cols[0]+cols[1])/2,y+30);
- c.font='bold 18px Arial';c.fillText(r.category,(cols[1]+cols[2])/2,y+30);
- c.font='17px Arial';c.fillText(r.name.slice(0,62),(cols[2]+cols[3])/2,y+30);
- c.fillText(r.warranty,(cols[3]+cols[4])/2,y+30);c.fillText(String(r.qty),(cols[4]+cols[5])/2,y+30);
- c.textAlign='right';c.fillText(money(r.price),cols[6]-12,y+30);c.font='bold 18px Arial';c.fillText(money(r.price*r.qty),cols[7]-12,y+30);
+ c.fillStyle='#20242c';c.font='27px Arial';c.textAlign='center';c.fillText(String(i+1),(cols[0]+cols[1])/2,y+30);
+ c.font='bold 27px Arial';c.fillText(r.category,(cols[1]+cols[2])/2,y+30);
+ c.font='27px Arial';c.fillText(r.name.slice(0,62),(cols[2]+cols[3])/2,y+30);
+ c.font='27px Arial';c.fillText(r.warranty,(cols[3]+cols[4])/2,y+30);c.font='27px Arial';c.fillText(String(r.qty),(cols[4]+cols[5])/2,y+30);
+ c.textAlign='right';c.font='27px Arial';c.fillText(money(r.price),cols[6]-12,y+30);c.font='bold 27px Arial';c.fillText(money(r.price*r.qty),cols[7]-12,y+30);
  });
  const ytot=headerY+48+rows.length*rowH+18;c.fillStyle='#111318';c.fillRect(22,ytot,W-44,62);c.fillStyle='#087cf0';c.fillRect(W-245,ytot,223,62);
  c.fillStyle='#fff';c.textAlign='center';c.font='bold 29px Arial';c.fillText('TỔNG GIÁ TRỊ BÁO GIÁ',(W-245)/2,ytot+41);
@@ -804,6 +829,8 @@ async function handleSession(session){
  const {data:profile,error}=await sb.from('hcpc_profiles').select('email,full_name,role,active').eq('id',currentUser.id).single();
  if(error||!profile||!profile.active){await sb.auth.signOut();$('authMessage').textContent='Tài khoản chưa được cấp quyền hoặc đã bị khóa.';return}
  currentProfile=profile;
+ $('configAdminTools').classList.toggle('hidden',profile.role!=='admin');
+ $('configRoleHint').textContent=profile.role==='admin'?'ADMIN được thêm, sửa và xóa cấu hình. SALE chỉ được xem và nạp cấu hình vào báo giá.':'Tài khoản SALE chỉ được xem và nạp cấu hình vào báo giá. Liên hệ ADMIN nếu cần thay đổi cấu hình.';
  $('authGate').classList.add('hidden');$('userBar').classList.remove('hidden');
  $('signedName').textContent=profile.full_name||profile.email;
  $('signedRole').textContent='· '+(profile.role==='admin'?'ADMIN':'SALE');
