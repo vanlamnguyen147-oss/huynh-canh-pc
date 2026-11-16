@@ -33,7 +33,7 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
 .rowdel{padding:5px 8px;background:#fce9e9;color:#b32929}
 .totalbar{display:flex;margin-top:13px;background:#15171b;color:white;align-items:center;min-height:54px}
 .totalbar .label{flex:1;text-align:center;font-size:clamp(17px,3vw,25px);font-weight:900;color:#fff;padding:10px}
-.totalbar .amount{background:var(--blue);padding:13px 16px;font-size:clamp(17px,3vw,23px);font-weight:900;white-space:nowrap}
+.totalbar .amount{background:var(--blue);padding:13px 16px;font-size:clamp(17px,3vw,23px);font-weight:900;white-space:nowrap}.totalbar .override{width:230px;max-width:42%;background:#fff;color:#111318;border:2px solid #087cf0;border-radius:7px;padding:9px 10px;font-size:18px;font-weight:850;text-align:right;margin:6px}.totalbar .override::placeholder{color:#7a8492;font-size:13px;font-weight:500}
 .notes{margin-top:16px}.notes h3{margin:0;background:#15171b;color:white;padding:10px 12px;font-size:14px}.notes ul{padding-left:22px;margin:8px 0;color:#414b5a}.notes li{margin:5px 0}
 .footer{text-align:center;padding:10px;font-size:18px;font-weight:850;color:var(--blue)}
 .history-list{display:grid;gap:8px}.history-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:9px}.history-item strong{display:block}.history-item small{color:var(--muted)}
@@ -111,7 +111,7 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
 
  <div class="toolbar no-print">
   <button onclick="saveQuote()" class="green">💾 Lưu báo giá</button>
-  <button onclick="exportJPG()">🖼 Xuất ảnh JPG</button>
+  <button onclick="chooseJPGTemplate()">🖼 Xuất ảnh JPG</button>
   <button onclick="window.print()" class="dark">🖨 In báo giá A4</button>
   <button onclick="newQuote()" class="secondary">＋ Báo giá mới</button>
   <button id="installmentBtn" onclick="toggleInstallment()" class="secondary no-print">💳 GÓP</button>
@@ -185,10 +185,10 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
   </div>
   <div class="toolbar no-print" style="margin-top:10px">
    <button onclick="addRow()" class="secondary">＋ Thêm linh kiện</button>
-   <button onclick="addSample()" class="secondary">Nạp cấu hình mẫu</button>
+   <button onclick="openSampleConfigPicker()" class="secondary">Nạp cấu hình mẫu</button>
    
   </div>
-  <div class="totalbar"><div class="label">TỔNG GIÁ TRỊ BÁO GIÁ</div><div class="amount" id="grandTotal">0 đ</div></div>
+  <div class="totalbar"><div class="label">TỔNG GIÁ TRỊ BÁO GIÁ</div><input class="override" id="totalOverride" type="number" min="0" step="1000" placeholder="Tự động tính" title="Nhập giá tổng riêng nếu muốn thay tổng tự động" oninput="calc()"><div class="amount" id="grandTotal">0 đ</div></div><div class="hint">Muốn dùng tổng tự động: xóa số trong ô giá tổng tùy chỉnh. Giá nhập riêng sẽ được lưu cùng báo giá.</div>
   <section id="installmentPanel" class="card no-print hidden" style="margin-top:14px">
    <div class="toolbar" style="justify-content:space-between">
     <h2 style="margin:0">💳 TÍNH TRẢ GÓP HD SAISON</h2>
@@ -231,6 +231,24 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
  </section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<div id="sampleConfigModal" class="hidden" style="position:fixed;inset:0;z-index:5000;background:#101827aa;padding:18px;overflow:auto">
+ <div class="card" style="max-width:760px;margin:5vh auto;padding:18px">
+  <div class="toolbar" style="justify-content:space-between;align-items:center">
+   <h2 style="margin:0">📋 DANH SÁCH NẠP CẤU HÌNH MẪU</h2>
+   <button class="secondary" onclick="closeSampleConfigPicker()">Đóng ✕</button>
+  </div>
+  <p class="hint">Chọn mẫu để nạp vào báo giá. ADMIN có thể tạo, sửa hoặc xóa mẫu; SALE chỉ được sử dụng mẫu.</p>
+  <div id="sampleConfigAdmin" class="hidden" style="border:1px solid var(--line);border-radius:10px;padding:12px;margin:12px 0">
+   <strong>＋ TẠO MẪU TỪ BẢNG BÁO GIÁ HIỆN TẠI</strong>
+   <div class="grid" style="grid-template-columns:2fr 1fr;margin-top:8px">
+    <div class="field"><label>TÊN MẪU CẤU HÌNH</label><input id="sampleConfigNewName" placeholder="Ví dụ: Gaming i5 RTX 5060 – 15 triệu"></div>
+    <div class="field" style="justify-content:end"><button class="green" onclick="saveCurrentAsSampleConfig()">Lưu mẫu mới</button></div>
+   </div>
+   <small class="hint">Hãy nhập linh kiện và giá vào bảng báo giá trước khi lưu thành mẫu.</small>
+  </div>
+  <div id="sampleConfigList" class="history-list"><div class="empty">Đang tải danh sách mẫu…</div></div>
+ </div>
+</div>
 <script>
 const SUPABASE_URL="https://qlsgdhwlakujazmlamdi.supabase.co";
 const SUPABASE_ANON_KEY="sb_publishable_pc6ZSiijOaaPGCpW7DIDiw_A_McLQYz";
@@ -334,24 +352,47 @@ function calc(){
  tr.querySelector('.stt').textContent=i+1;
  const q=Number(tr.querySelector('.qty').value||0),p=Number(String(tr.querySelector('.price').value).replace(/[^\d.-]/g,''))||0;
  const v=q*p;sum+=v;tr.querySelector('.total').textContent=money(v);
- });$('grandTotal').textContent=money(sum)+' đ';
+ });
+ const override=String($('totalOverride')?.value||'').trim();
+ const finalTotal=override!==''?(Number(override)||0):sum;
+ $('grandTotal').textContent=money(finalTotal)+' đ';
 }
+function getQuoteTotal(){const v=String($('totalOverride')?.value||'').trim();if(v!=='')return Number(v)||0;return getRows().reduce((a,r)=>a+r.qty*r.price,0)}
 function updateValid(){$('validText').textContent=($('validHours').value||12)+' giờ kể từ thời điểm gửi';$('noteHours').textContent=$('validHours').value||12}
-function addSample(){
- $('partsBody').innerHTML='';
- const sample=[
- ['CPU','Intel Core i5 14600KF','36T',1,4690000],
- ['MAIN','MSI B760M Gaming Plus Wifi DDR4','36T',1,3290000],
- ['RAM','OCPC XTREME II 16GB DDR4 Bus 3200 C16 Black','36T',2,2650000],
- ['SSD','GIGABYTE 4000E 500GB PCIe GEN 4','36T',1,2090000],
- ['VGA','MSI RTX 5060 8G VENTUS 3X OC (3 Fan)','36T',1,12990000],
- ['TẢN','Tản nhiệt nước ID-COOLING FX240 TD ARGB','24T',1,1190000],
- ['NGUỒN','VSP VGP750 PRO 750W 80 Plus Bronze','36T',1,1090000],
- ['CASE','KENOO ESPORT MK400 (Bể cá kính cong)','12T',1,500000],
- ['PHỤ KIỆN','Fan Starlink/Leopard Vô cực ARGB','12T',3,100000]
- ];
- sample.forEach(x=>addRow({category:x[0],name:x[1],warranty:x[2],qty:x[3],price:x[4]}));calc();
+function openSampleConfigPicker(){
+ const modal=$('sampleConfigModal');modal.classList.remove('hidden');
+ $('sampleConfigAdmin').classList.toggle('hidden',currentProfile?.role!=='admin');
+ $('sampleConfigNewName').value='';renderSampleConfigPicker();loadPcConfigs();
 }
+function closeSampleConfigPicker(){$('sampleConfigModal').classList.add('hidden')}
+function renderSampleConfigPicker(){
+ const el=$('sampleConfigList');
+ if(!pcConfigs.length){el.innerHTML='<div class="empty">Chưa có mẫu cấu hình. ADMIN hãy tạo mẫu từ bảng báo giá hiện tại.</div>';return}
+ el.innerHTML=pcConfigs.map(c=>{
+  const rows=Array.isArray(c.data?.rows)?c.data.rows:[];
+  const desc=rows.map(r=>[r.category,r.name].filter(Boolean).join(': ')).filter(Boolean).slice(0,5).join(' · ');
+  const admin=currentProfile?.role==='admin'?`<button class="secondary" onclick="editSampleConfig('${esc(c.local_id)}')">Sửa mẫu</button><button class="danger" onclick="deleteSampleConfig('${esc(c.local_id)}')">Xóa</button>`:'';
+  return `<div class="history-item"><div style="min-width:0;flex:1"><strong>${esc(c.name||'Cấu hình PC')}</strong><small>${esc(desc||'Chưa có mô tả')} · ${rows.length} linh kiện</small></div><div class="toolbar" style="margin:0"><button onclick="useSampleConfig('${esc(c.local_id)}')">Nạp mẫu</button>${admin}</div></div>`;
+ }).join('');
+}
+async function saveCurrentAsSampleConfig(){
+ if(currentProfile?.role!=='admin'){alert('Chỉ ADMIN mới được tạo mẫu.');return}
+ const name=$('sampleConfigNewName').value.trim(),rows=configRowsFromQuote();
+ if(!name){alert('Vui lòng nhập tên mẫu cấu hình.');$('sampleConfigNewName').focus();return}
+ if(!rows.length||!rows.some(r=>r.category||r.name)){alert('Bảng báo giá chưa có linh kiện để lưu thành mẫu.');return}
+ const local_id='cfg-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
+ const {error}=await sb.from('hcpc_pc_configs').upsert({local_id,name,data:{name,rows},created_by:currentUser.id,updated_at:new Date().toISOString()},{onConflict:'local_id'});
+ if(error){alert('Không lưu được mẫu: '+error.message);return}
+ $('sampleConfigNewName').value='';await loadPcConfigs(true);alert('Đã lưu mẫu cấu hình: '+name);
+}
+function useSampleConfig(id){usePcConfig(id);closeSampleConfigPicker()}
+function editSampleConfig(id){
+ closeSampleConfigPicker();editPcConfig(id);
+ $('configPanel').classList.remove('hidden');$('configVaultBtn').setAttribute('aria-expanded','true');$('configVaultBtn').textContent='🖥️ Đóng kho cấu hình';
+ $('configPanel').scrollIntoView({behavior:'smooth',block:'start'});
+ alert('Đã đưa mẫu vào bảng báo giá để chỉnh sửa. Thêm, xóa hoặc thay đổi linh kiện rồi nhấn “Cập nhật cấu hình” trong Kho cấu hình PC để lưu mẫu.');
+}
+async function deleteSampleConfig(id){await deletePcConfig(id);renderSampleConfigPicker()}
 
 function configRowsFromQuote(){return getRows().map(r=>({...r}));}
 async function savePcConfig(){
@@ -392,7 +433,7 @@ async function loadPcConfigs(showError=false){
   const {data,error}=await sb.from('hcpc_pc_configs').select('local_id,name,data,created_by,updated_at').order('updated_at',{ascending:false}).limit(500);
   if(error)throw error;
   pcConfigs=(data||[]).filter(x=>!String(x.local_id||'').startsWith('part-'));
-  renderPcConfigs();
+  renderPcConfigs();if($('sampleConfigModal')&&!$('sampleConfigModal').classList.contains('hidden'))renderSampleConfigPicker();
  }catch(err){
   $('configList').innerHTML='<div class="empty">Không tải được kho cấu hình: '+esc(err.message)+'</div>';
   if(showError)alert('Lỗi tải cấu hình: '+err.message);
@@ -545,7 +586,7 @@ function toggleInstallment(){
  if(opening){useQuotePriceForInstallment();panel.scrollIntoView({behavior:'smooth',block:'start'});}
 }
 function useQuotePriceForInstallment(){
- const total=Number(String($('grandTotal')?.textContent||'0').replace(/[^\d]/g,''))||0;
+ const total=getQuoteTotal();
  $('instPrice').value=total;
  updateInstallmentDownAmount();
  calculateInstallment();
@@ -649,12 +690,12 @@ function escapeHtmlPrint(value){
 function formData(){
  return {id:(editingQuoteId||Date.now().toString()),quoteNo:$('quoteNo').value,quoteDate:$('quoteDate').value,validHours:$('validHours').value,
  preparedBy:$('preparedBy').value,customer:$('customer').value,customerInfo:$('customerInfo').value,
- rows:getRows(),total:getRows().reduce((a,r)=>a+r.qty*r.price,0),savedAt:new Date().toISOString()};
+ rows:getRows(),total:getQuoteTotal(),totalOverride:$('totalOverride').value,savedAt:new Date().toISOString()};
 }
 function fillForm(q){
  editingQuoteId=q.id?String(q.id):null;
  $('quoteNo').value=q.quoteNo||'';$('quoteDate').value=q.quoteDate||today();$('validHours').value=q.validHours||12;
- $('preparedBy').value=q.preparedBy||'';$('customer').value=q.customer||'';$('customerInfo').value=q.customerInfo||'';
+ $('preparedBy').value=q.preparedBy||'';$('customer').value=q.customer||'';$('customerInfo').value=q.customerInfo||'';$('totalOverride').value=q.totalOverride??'';
  $('partsBody').innerHTML='';(q.rows||[]).forEach(addRow);if(!q.rows?.length)addRow();updateValid();calc();
 }
 async function saveQuote(){
@@ -693,62 +734,113 @@ function restoreData(e){
  const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d.settings){settings=d.settings;localStorage.setItem('hcpc_settings',JSON.stringify(settings));applySettings()}if(Array.isArray(d.history)){historyData=d.history;localStorage.setItem('hcpc_history',JSON.stringify(historyData));renderHistory()}alert('Đã khôi phục dữ liệu.')}catch(err){alert('File sao lưu không hợp lệ.')}};r.readAsText(f);e.target.value='';
 }
 function downloadBlob(blob,name){const a=document.createElement('a');const u=URL.createObjectURL(blob);a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1500)}
-function exportJPG(){
- const q=formData(),W=1600,pad=42;const scale=2;
- const canvas=document.createElement('canvas');canvas.width=W*scale;canvas.height=1200*scale;
+function chooseJPGTemplate(){
+ const old=document.getElementById('jpgTemplatePicker');if(old)old.remove();
+ const modal=document.createElement('div');modal.id='jpgTemplatePicker';
+ modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:99999;display:flex;align-items:center;justify-content:center;padding:18px;';
+ modal.innerHTML=`<div style="width:min(440px,100%);background:#fff;border:3px solid #ffd400;border-radius:16px;padding:22px;box-shadow:0 12px 40px #0008;font-family:Arial,sans-serif;text-align:center"><div style="font-size:22px;font-weight:900;margin-bottom:8px;color:#171717">CHỌN MẪU IN ẢNH JPG</div><div style="font-size:14px;color:#555;margin-bottom:18px">Bạn muốn xuất báo giá theo mẫu nào?</div><button id="jpg7col" style="width:100%;padding:14px;margin:5px 0;background:#171717;color:#ffd400;border:2px solid #ffd400;border-radius:9px;font-size:17px;font-weight:800;cursor:pointer">MẪU 7 CỘT</button><button id="jpg4col" style="width:100%;padding:14px;margin:5px 0;background:#fff5ce;color:#171717;border:2px solid #d6aa00;border-radius:9px;font-size:17px;font-weight:800;cursor:pointer">MẪU 4 CỘT</button><button id="jpgCancel" style="margin-top:10px;padding:9px 20px;background:#eee;color:#333;border:0;border-radius:8px;cursor:pointer">Hủy</button></div>`;
+ document.body.appendChild(modal);
+ modal.querySelector('#jpg7col').onclick=()=>{modal.remove();exportJPG('7')};
+ modal.querySelector('#jpg4col').onclick=()=>{modal.remove();exportJPG('4')};
+ modal.querySelector('#jpgCancel').onclick=()=>modal.remove();
+ modal.addEventListener('click',e=>{if(e.target===modal)modal.remove()});
+}
+function exportJPG(mode='7'){
+ const isFour=mode==='4';
+ const q=formData(),W=1600,scale=2,pad=22;
+ const rows=q.rows||[],rowH=49,headerY=390,tableHeaderH=50;
+ const totalY=headerY+tableHeaderH+rows.length*rowH+20;
+ const notesY=totalY+88,H=notesY+210;
+ const canvas=document.createElement('canvas');canvas.width=W*scale;canvas.height=H*scale;
  const c=canvas.getContext('2d');c.scale(scale,scale);
- const rows=q.rows;const rowH=49;const headerY=390;const tableBottom=headerY+48+(rows.length+1)*rowH;
- const H=Math.max(1200,tableBottom+260);canvas.height=H*scale;c.scale(1,1);
- // reset transform after resizing
- c.setTransform(scale,0,0,scale,0,0);
+ const gold='#ffd400',gold2='#f5b900',black='#111111',ink='#151515';
+ const grad=(x,y,w,h,a,b)=>{const g=c.createLinearGradient(x,y,x+w,y+h);g.addColorStop(0,a);g.addColorStop(1,b);return g};
+ const fit=(txt,max,font)=>{let t=String(txt??'');c.font=font;while(t.length&&c.measureText(t).width>max)t=t.slice(0,-1);return t===String(txt??'')?t:(t.length>2?t.slice(0,-2)+'…':'…')};
  c.fillStyle='#fff';c.fillRect(0,0,W,H);
- c.fillStyle='#111318';c.fillRect(22,18,W-44,150);c.fillStyle='#087cf0';c.fillRect(W-190,18,168,7);
- c.fillStyle='#fff';c.font='900 48px Arial';c.fillText(settings.name||'HUỲNH CẢNH PC',75,78);
- c.font='24px Arial';c.fillText(settings.address||'PC Gaming – Đồ họa – Workstation',75,116);
- c.fillText('Zalo: '+(settings.phone||'Chưa cập nhật')+(settings.contact?'  |  '+settings.contact:''),75,148);
- c.fillStyle='#111';c.textAlign='center';c.font='bold 48px Arial';c.fillText('BẢNG BÁO GIÁ',W/2,245);
- c.fillStyle='#596477';c.font='italic 22px Arial';c.fillText('Hiệu lực báo giá: '+(q.validHours||12)+' giờ kể từ thời điểm gửi',W/2,284);
- c.textAlign='left';
- const drawField=(x,y,w,label,value)=>{c.fillStyle='#087cf0';c.fillRect(x,y,150,48);c.fillStyle='#fff';c.font='bold 17px Arial';c.fillText(label,x+12,y+30);c.fillStyle='#eaf3ff';c.fillRect(x+150,y,w-150,48);c.fillStyle='#252b36';c.font='20px Arial';c.fillText(value||'',x+164,y+30)};
- drawField(22,315,750,'KHÁCH HÀNG',q.customer);drawField(772,315,806,'THÔNG TIN',q.customerInfo);
- const cols=[22,90,280,940,1040,1125,1360,1578];const headers=['STT','LINH KIỆN','CHI TIẾT / MODEL','BH','SL','ĐƠN GIÁ','THÀNH TIỀN'];
- c.fillStyle='#111318';c.fillRect(22,headerY,W-44,48);c.font='bold 19px Arial';c.fillStyle='#fff';c.textAlign='center';
- headers.forEach((h,i)=>{
-   c.font='bold 27px Arial';
-   c.fillText(h,(cols[i]+cols[i+1])/2,headerY+31);
-  });
+ // Header: bám sát mẫu đen-vàng, viền kép và các mảng cắt góc
+ c.fillStyle=grad(0,0,W,150,'#050505','#202020');c.fillRect(14,12,W-28,140);
+ c.strokeStyle=gold;c.lineWidth=5;c.strokeRect(14,12,W-28,140);
+ c.strokeStyle='#8f7400';c.lineWidth=2;c.strokeRect(21,19,W-42,126);
+ c.fillStyle=gold;c.beginPath();c.moveTo(14,145);c.lineTo(390,145);c.lineTo(430,112);c.lineTo(14,112);c.closePath();c.fill();
+ // monogram HC and shop name
+ c.save();c.translate(65,98);c.rotate(-.12);c.fillStyle='#fff';c.font='italic 900 76px Arial';c.fillText('HC',0,0);c.strokeStyle=gold;c.lineWidth=8;c.beginPath();c.ellipse(47,-18,58,43,-.35,.2,5.9);c.stroke();c.restore();
+ c.fillStyle='#fff';c.font='italic 900 48px Arial';c.fillText('HUỲNH CẢNH',190,82);
+ c.fillStyle=gold;c.fillText('PC',555,82);
+ c.fillStyle=gold;c.fillRect(680,34,4,80);
+ c.fillStyle='#fff';c.font='23px Arial';
+ c.fillText('📍 '+(settings.address||'118/144 Phan Huy Ích Tân Sơn HCM'),710,62);
+ c.fillText('🟨 Zalo: '+(settings.phone||'0333 941 980')+(settings.contact?'  |  '+settings.contact:''),710,105);
+ // angular gold accents and PC tower on the right
+ c.fillStyle=gold;c.beginPath();c.moveTo(1170,12);c.lineTo(1395,12);c.lineTo(1320,88);c.lineTo(1095,88);c.closePath();c.fill();
+ c.fillStyle='#090909';c.beginPath();c.moveTo(1190,20);c.lineTo(1380,20);c.lineTo(1314,82);c.lineTo(1125,82);c.closePath();c.fill();
+ c.strokeStyle=gold;c.lineWidth=4;c.strokeRect(1430,28,112,100);c.strokeRect(1442,40,88,76);
+ c.fillStyle=gold;c.beginPath();c.arc(1486,62,13,0,Math.PI*2);c.arc(1486,96,13,0,Math.PI*2);c.fill();
+ c.fillStyle=gold;c.beginPath();for(let k=0;k<3;k++){let x=1155+k*36;c.moveTo(x,145);c.lineTo(x+24,120);c.lineTo(x+42,120);c.lineTo(x+18,145)}c.fill();
+ // title banner with three diagonal stripes on both sides
+ c.fillStyle=gold;c.beginPath();c.moveTo(390,178);c.lineTo(1210,178);c.lineTo(1165,250);c.lineTo(435,250);c.closePath();c.fill();
+ c.fillStyle=gold;c.beginPath();for(let k=0;k<3;k++){let x=360-k*34;c.moveTo(x,178);c.lineTo(x+24,178);c.lineTo(x-22,250);c.lineTo(x-46,250)}for(let k=0;k<3;k++){let x=1240+k*34;c.moveTo(x,178);c.lineTo(x+24,178);c.lineTo(x-22,250);c.lineTo(x-46,250)}c.fill();
+ c.fillStyle=ink;c.textAlign='center';c.font='900 58px Arial';c.fillText('BẢNG BÁO GIÁ',W/2,228);
+ c.fillStyle='#111';c.font='italic 24px Arial';c.fillText('Hiệu lực báo giá: '+(q.validHours||12)+' giờ kể từ thời điểm gửi',W/2,284);
+ // customer band
+ c.fillStyle='#fff3c4';c.fillRect(22,315,W-44,50);
+ c.fillStyle=gold;c.beginPath();c.moveTo(22,315);c.lineTo(220,315);c.lineTo(195,365);c.lineTo(22,365);c.fill();
+ c.fillStyle=black;c.font='bold 21px Arial';c.textAlign='left';c.fillText('KHÁCH HÀNG',40,347);
+ c.fillStyle=black;c.beginPath();c.moveTo(760,315);c.lineTo(970,315);c.lineTo(945,365);c.lineTo(735,365);c.fill();
+ c.fillStyle=gold;c.textAlign='center';c.fillText('THÔNG TIN',850,347);
+ c.fillStyle=ink;c.textAlign='left';c.font='22px Arial';c.fillText(fit(q.customer||'',470,'22px Arial'),235,347);
+ c.fillText(fit(q.customerInfo||'',570,'22px Arial'),990,347);
+ // seven-column quote table
+ const cols=isFour?[22,100,285,1370,1578]:[22,100,285,920,1020,1105,1325,1578];
+ const headers=isFour?['STT','LINH KIỆN','CHI TIẾT / MODEL','BH']:['STT','LINH KIỆN','CHI TIẾT / MODEL','BH','SL','ĐƠN GIÁ','THÀNH TIỀN'];
+ c.fillStyle=grad(22,headerY,W-44,tableHeaderH,'#111','#292929');c.fillRect(22,headerY,W-44,tableHeaderH);
+ c.strokeStyle=gold;c.lineWidth=2;c.strokeRect(22,headerY,W-44,tableHeaderH);
+ c.fillStyle=gold;c.font='bold 25px Arial';c.textAlign='center';
+ headers.forEach((h,i)=>c.fillText(h,(cols[i]+cols[i+1])/2,headerY+33));
  rows.forEach((r,i)=>{
- const y=headerY+48+i*rowH;c.fillStyle=i%2?'#f2f5f8':'#fff';c.fillRect(22,y,W-44,rowH);c.strokeStyle='#252a32';c.lineWidth=1;c.strokeRect(22,y,W-44,rowH);
- for(let j=1;j<cols.length-1;j++){c.beginPath();c.moveTo(cols[j],y);c.lineTo(cols[j],y+rowH);c.stroke()}
- c.fillStyle='#20242c';c.font='27px Arial';c.textAlign='center';c.fillText(String(i+1),(cols[0]+cols[1])/2,y+30);
- c.font='bold 27px Arial';c.fillText(r.category,(cols[1]+cols[2])/2,y+30);
- c.font='27px Arial';c.fillText(r.name.slice(0,62),(cols[2]+cols[3])/2,y+30);
- c.font='27px Arial';c.fillText(r.warranty,(cols[3]+cols[4])/2,y+30);c.font='27px Arial';c.fillText(String(r.qty),(cols[4]+cols[5])/2,y+30);
- c.textAlign='right';c.font='27px Arial';c.fillText(money(r.price),cols[6]-12,y+30);c.font='bold 27px Arial';c.fillText(money(r.price*r.qty),cols[7]-12,y+30);
+  const y=headerY+tableHeaderH+i*rowH;
+  c.fillStyle=i%2?'#fff7dc':'#ffffff';c.fillRect(22,y,W-44,rowH);
+  c.strokeStyle='#252525';c.lineWidth=1;c.strokeRect(22,y,W-44,rowH);
+  for(let j=1;j<cols.length-1;j++){c.beginPath();c.moveTo(cols[j],y);c.lineTo(cols[j],y+rowH);c.stroke()}
+  const cy=y+32;c.textAlign='center';c.fillStyle=ink;
+  c.font='25px Arial';c.fillText(String(i+1),(cols[0]+cols[1])/2,cy);
+  c.font='bold 25px Arial';c.fillText(fit(r.category||'',cols[2]-cols[1]-12,'bold 25px Arial'),(cols[1]+cols[2])/2,cy);
+  c.font='25px Arial';c.fillText(fit(r.name||'',cols[3]-cols[2]-18,'25px Arial'),(cols[2]+cols[3])/2,cy);
+  if(isFour){c.fillText(fit(r.warranty||'',cols[4]-cols[3]-12,'25px Arial'),(cols[3]+cols[4])/2,cy)}
+  else{
+   c.fillText(fit(r.warranty||'',cols[4]-cols[3]-8,'25px Arial'),(cols[3]+cols[4])/2,cy);
+   c.fillText(String(r.qty??1),(cols[4]+cols[5])/2,cy);
+   c.textAlign='right';c.fillText(money(Number(r.price)||0),cols[6]-12,cy);
+   c.font='bold 25px Arial';c.fillText(money((Number(r.qty)||0)*(Number(r.price)||0)),cols[7]-12,cy);
+  }
  });
- const ytot=headerY+48+rows.length*rowH+18;c.fillStyle='#111318';c.fillRect(22,ytot,W-44,62);c.fillStyle='#087cf0';c.fillRect(W-245,ytot,223,62);
- c.fillStyle='#fff';c.textAlign='center';c.font='bold 29px Arial';c.fillText('TỔNG GIÁ TRỊ BÁO GIÁ',(W-245)/2,ytot+41);
- c.font='bold 25px Arial';c.fillText(money(q.total)+' đ',W-133,ytot+40);
- const yn=ytot+90;c.fillStyle='#111318';c.fillRect(22,yn,W-44,42);c.fillStyle='#fff';c.textAlign='left';c.font='bold 18px Arial';c.fillText('THÔNG TIN & LƯU Ý',35,yn+28);
- c.fillStyle='#343b47';c.font='18px Arial';c.fillText('• Giá có hiệu lực trong '+(q.validHours||12)+' giờ kể từ thời điểm gửi báo giá.',35,yn+76);
- c.fillText('• Thời gian bảo hành được ghi theo từng linh kiện trong bảng.',35,yn+111);
- c.fillText('• Cảm ơn Quý khách đã tin tưởng '+(settings.name||'HUỲNH CẢNH PC')+'!',35,yn+146);
- c.fillStyle='#087cf0';c.textAlign='center';c.font='bold 25px Arial';c.fillText((settings.name||'HUỲNH CẢNH PC')+'  –  Zalo: '+(settings.phone||'Chưa cập nhật'),W/2,yn+205);
- const fileName=(q.quoteNo||'Bao_gia_Huynh_Canh_PC')+'.jpg';
- // iOS Safari does not reliably honor <a download> for canvas data URLs.
- // Export a Blob and offer the native share sheet so the user can choose Save Image.
+ // total strip; honors the editable total override
+ c.fillStyle=grad(22,totalY,W-44,64,'#111','#242424');c.fillRect(22,totalY,W-44,64);
+ c.fillStyle=gold;c.beginPath();c.moveTo(1285,totalY);c.lineTo(1578,totalY);c.lineTo(1578,totalY+64);c.lineTo(1235,totalY+64);c.closePath();c.fill();
+ c.fillStyle=gold;c.textAlign='center';c.font='900 34px Arial';c.fillText('TỔNG GIÁ TRỊ BÁO GIÁ',W/2-40,totalY+43);
+ c.fillStyle=black;c.font='900 34px Arial';c.fillText(money(getQuoteTotal())+' đ',1405,totalY+43);
+ // notes and footer
+ c.fillStyle=grad(22,notesY,W-44,42,'#111','#292929');c.fillRect(22,notesY,W-44,42);
+ c.fillStyle=gold;c.font='bold 23px Arial';c.textAlign='left';c.fillText('THÔNG TIN & LƯU Ý',42,notesY+29);
+ c.strokeStyle=gold;c.lineWidth=2;c.strokeRect(22,notesY,W-44,155);
+ c.fillStyle=ink;c.font='21px Arial';
+ c.fillText('• Giá có hiệu lực trong '+(q.validHours||12)+' giờ kể từ thời điểm gửi báo giá.',42,notesY+78);
+ c.fillText('• Thời gian bảo hành được ghi theo từng linh kiện trong bảng.',42,notesY+111);
+ c.fillText('• Cảm ơn Quý khách đã tin tưởng '+(settings.name||'HUỲNH CẢNH PC')+'!',42,notesY+144);
+ c.fillStyle=gold;c.fillRect(0,H-55,W,55);c.fillStyle=black;c.fillRect(0,H-47,W,36);
+ c.fillStyle=gold;c.beginPath();c.moveTo(0,H-55);c.lineTo(190,H-55);c.lineTo(220,H-30);c.lineTo(0,H-30);c.closePath();c.fill();
+ c.beginPath();c.moveTo(W,H-55);c.lineTo(W-190,H-55);c.lineTo(W-220,H-30);c.lineTo(W,H-30);c.closePath();c.fill();
+ c.fillStyle=gold;c.beginPath();c.moveTo(430,H-55);c.lineTo(1170,H-55);c.lineTo(1210,H-10);c.lineTo(390,H-10);c.closePath();c.fill();
+ c.fillStyle=black;c.textAlign='center';c.font='900 27px Arial';
+ c.fillText((settings.name||'HUỲNH CẢNH PC')+'  –  Zalo: '+(settings.phone||'0333 941 980'),W/2,H-18);
+ const fileName=(q.quoteNo||'Bao_gia_Huynh_Canh_PC')+'_mau_'+mode+'_cot.jpg';
  canvas.toBlob(async (blob)=>{
   if(!blob){alert('Không thể tạo ảnh JPG. Vui lòng thử lại hoặc dùng Safari phiên bản mới.');return;}
   const file=new File([blob],fileName,{type:'image/jpeg'});
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   if(isIOS && navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))){
-   try{await navigator.share({files:[file],title:fileName});}
-   catch(err){if(err.name!=='AbortError') openJpgInTab(blob);}
-   return;
+   try{await navigator.share({files:[file],title:fileName});}catch(err){if(err.name!=='AbortError')openJpgInTab(blob);}return;
   }
-  const url=URL.createObjectURL(blob);
-  const link=document.createElement('a');link.href=url;link.download=fileName;document.body.appendChild(link);link.click();link.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),10000);
+  const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=fileName;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
  },'image/jpeg',.94);
 }
 function openJpgInTab(blob){
