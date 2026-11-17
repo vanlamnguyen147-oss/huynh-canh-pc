@@ -136,9 +136,10 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
 
  <section id="partsVault" class="card no-print hidden">
   <h2>🧩 Kho linh kiện dùng chung</h2>
-  <div class="grid" style="grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:10px">
+  <div class="grid" style="grid-template-columns:repeat(6,minmax(0,1fr));margin-bottom:10px">
    <div class="field"><label>NHÓM LINH KIỆN</label><input id="vaultCategory" placeholder="CPU / MAIN / RAM..."></div>
    <div class="field" style="grid-column:span 2"><label>TÊN LINH KIỆN / MODEL</label><input id="vaultName" placeholder="Ví dụ: Intel Core i5 14400F"></div>
+   <div class="field"><label>HÌNH THỨC</label><select id="vaultCondition"><option value="">-- Chọn --</option><option>NEW</option><option>NEW TRAY</option><option>2ND</option></select></div>
    <div class="field"><label>BẢO HÀNH</label><input id="vaultWarranty" placeholder="36T"></div>
    <div class="field"><label>GIÁ BÁN (VNĐ)</label><input id="vaultPrice" type="number" min="0" step="1000" placeholder="0"></div>
   </div>
@@ -179,7 +180,7 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
   </div>
   <div class="tablewrap">
    <table id="partsTable">
-    <thead><tr><th style="width:48px">STT</th><th style="width:105px">LINH KIỆN</th><th>CHI TIẾT / MODEL</th><th style="width:65px">BH</th><th style="width:55px">SL</th><th style="width:125px">ĐƠN GIÁ</th><th style="width:135px">THÀNH TIỀN</th><th class="no-print hide-print">XÓA</th></tr></thead>
+    <thead><tr><th style="width:48px">STT</th><th style="width:105px">LINH KIỆN</th><th>CHI TIẾT / MODEL</th><th style="width:105px">HÌNH THỨC</th><th style="width:65px">BH</th><th style="width:55px">SL</th><th style="width:125px">ĐƠN GIÁ</th><th style="width:135px">THÀNH TIỀN</th><th class="no-print hide-print">XÓA</th></tr></thead>
     <tbody id="partsBody"></tbody>
    </table>
   </div>
@@ -326,6 +327,7 @@ function addRow(item={}){
  tr.innerHTML=`<td class="stt"></td>
  <td><input class="category" placeholder="CPU" value="${esc(item.category||'')}"></td>
  <td><input class="name" list="vaultPartSuggestions" autocomplete="off" placeholder="Nhập tên để tìm linh kiện..." value="${esc(item.name||'')}"></td>
+ <td><select class="condition"><option value="">-- Chọn --</option><option value="NEW" ${item.condition==='NEW'?'selected':''}>NEW</option><option value="NEW TRAY" ${item.condition==='NEW TRAY'?'selected':''}>NEW TRAY</option><option value="2ND" ${item.condition==='2ND'?'selected':''}>2ND</option></select></td>
  <td><input class="warranty" placeholder="36T" value="${esc(item.warranty||'')}"></td>
  <td><input class="qty" type="number" min="0" step="1" value="${item.qty??1}"></td>
  <td><input class="price money" inputmode="numeric" placeholder="0" value="${item.price??''}"></td>
@@ -344,7 +346,7 @@ function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;',
 function removeRow(btn){btn.closest('tr').remove();calc()}
 function getRows(){return [...$('partsBody').querySelectorAll('tr')].map(tr=>({
  category:tr.querySelector('.category').value,name:tr.querySelector('.name').value,
- warranty:tr.querySelector('.warranty').value,qty:Number(tr.querySelector('.qty').value||0),
+ condition:tr.querySelector('.condition')?.value||'',warranty:tr.querySelector('.warranty').value,qty:Number(tr.querySelector('.qty').value||0),
  price:Number(String(tr.querySelector('.price').value).replace(/[^\d.-]/g,''))||0
 }))}
 function calc(){
@@ -486,7 +488,7 @@ function togglePartsVault(){
 }
 function clearVaultForm(){
  editingVaultPartId=null;
- ['vaultCategory','vaultName','vaultWarranty','vaultPrice'].forEach(id=>$(id).value='');
+ ['vaultCategory','vaultName','vaultCondition','vaultWarranty','vaultPrice'].forEach(id=>$(id).value='');
 }
 async function loadVaultParts(showError=false){
  if(!currentUser)return;
@@ -533,6 +535,7 @@ function applyVaultSelection(input){
  const row=input.closest('tr');
  if(!row)return;
  row.querySelector('.category').value=d.category||'';
+ if(row.querySelector('.condition'))row.querySelector('.condition').value=d.condition||'';
  row.querySelector('.warranty').value=d.warranty||'';
  row.querySelector('.price').value=Number(d.price)||0;
  calc();
@@ -547,7 +550,7 @@ function renderVaultParts(){
 }
 async function saveVaultPart(){
  if(!currentUser){alert('Bạn cần đăng nhập trước.');return;}
- const part={category:$('vaultCategory').value.trim(),name:$('vaultName').value.trim(),warranty:$('vaultWarranty').value.trim(),price:Number($('vaultPrice').value)||0};
+ const part={category:$('vaultCategory').value.trim(),name:$('vaultName').value.trim(),condition:$('vaultCondition').value,warranty:$('vaultWarranty').value.trim(),price:Number($('vaultPrice').value)||0};
  if(!part.category||!part.name){alert('Vui lòng nhập nhóm linh kiện và tên / model.');return;}
  const localId=editingVaultPartId||('part-'+Date.now()+'-'+Math.random().toString(36).slice(2,8));
  const existing=vaultParts.find(x=>String(x.local_id)===String(localId));
@@ -561,13 +564,13 @@ function editVaultPart(id){
  const d=p.data?.part||{};
  editingVaultPartId=String(id);
  $('vaultCategory').value=d.category||'';$('vaultName').value=d.name||p.name||'';
- $('vaultWarranty').value=d.warranty||'';$('vaultPrice').value=Number(d.price)||0;
+ $('vaultCondition').value=d.condition||'';$('vaultWarranty').value=d.warranty||'';$('vaultPrice').value=Number(d.price)||0;
  $('partsVault').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function useVaultPart(id){
  const p=vaultParts.find(x=>String(x.local_id)===String(id));if(!p)return;
  const d=p.data?.part||{};
- addRow({category:d.category||'',name:d.name||p.name||'',warranty:d.warranty||'',qty:1,price:Number(d.price)||0});
+ addRow({category:d.category||'',name:d.name||p.name||'',condition:d.condition||'',warranty:d.warranty||'',qty:1,price:Number(d.price)||0});
  document.querySelector('#partsBody tr:last-child .name')?.focus();
 }
 async function deleteVaultPart(id){
@@ -738,15 +741,15 @@ function chooseJPGTemplate(){
  const old=document.getElementById('jpgTemplatePicker');if(old)old.remove();
  const modal=document.createElement('div');modal.id='jpgTemplatePicker';
  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:99999;display:flex;align-items:center;justify-content:center;padding:18px;';
- modal.innerHTML=`<div style="width:min(440px,100%);background:#fff;border:3px solid #ffd400;border-radius:16px;padding:22px;box-shadow:0 12px 40px #0008;font-family:Arial,sans-serif;text-align:center"><div style="font-size:22px;font-weight:900;margin-bottom:8px;color:#171717">CHỌN MẪU IN ẢNH JPG</div><div style="font-size:14px;color:#555;margin-bottom:18px">Bạn muốn xuất báo giá theo mẫu nào?</div><button id="jpg7col" style="width:100%;padding:14px;margin:5px 0;background:#171717;color:#ffd400;border:2px solid #ffd400;border-radius:9px;font-size:17px;font-weight:800;cursor:pointer">MẪU 7 CỘT</button><button id="jpg4col" style="width:100%;padding:14px;margin:5px 0;background:#fff5ce;color:#171717;border:2px solid #d6aa00;border-radius:9px;font-size:17px;font-weight:800;cursor:pointer">MẪU 4 CỘT</button><button id="jpgCancel" style="margin-top:10px;padding:9px 20px;background:#eee;color:#333;border:0;border-radius:8px;cursor:pointer">Hủy</button></div>`;
+ modal.innerHTML=`<div style="width:min(440px,100%);background:#fff;border:3px solid #ffd400;border-radius:16px;padding:22px;box-shadow:0 12px 40px #0008;font-family:Arial,sans-serif;text-align:center"><div style="font-size:22px;font-weight:900;margin-bottom:8px;color:#171717">CHỌN MẪU IN ẢNH JPG</div><div style="font-size:14px;color:#555;margin-bottom:18px">Bạn muốn xuất báo giá theo mẫu nào?</div><button id="jpg8col" style="width:100%;padding:14px;margin:5px 0;background:#171717;color:#ffd400;border:2px solid #ffd400;border-radius:9px;font-size:17px;font-weight:800;cursor:pointer">MẪU 8 CỘT</button><button id="jpg5col" style="width:100%;padding:14px;margin:5px 0;background:#fff5ce;color:#171717;border:2px solid #d6aa00;border-radius:9px;font-size:17px;font-weight:800;cursor:pointer">MẪU 5 CỘT</button><button id="jpgCancel" style="margin-top:10px;padding:9px 20px;background:#eee;color:#333;border:0;border-radius:8px;cursor:pointer">Hủy</button></div>`;
  document.body.appendChild(modal);
- modal.querySelector('#jpg7col').onclick=()=>{modal.remove();exportJPG('7')};
- modal.querySelector('#jpg4col').onclick=()=>{modal.remove();exportJPG('4')};
+ modal.querySelector('#jpg8col').onclick=()=>{modal.remove();exportJPG('8')};
+ modal.querySelector('#jpg5col').onclick=()=>{modal.remove();exportJPG('5')};
  modal.querySelector('#jpgCancel').onclick=()=>modal.remove();
  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove()});
 }
 function exportJPG(mode='7'){
- const isFour=mode==='4';
+ const isFour=mode==='5';
  const q=formData(),W=1600,scale=2,pad=22;
  const rows=q.rows||[],rowH=49,headerY=390,tableHeaderH=50;
  const totalY=headerY+tableHeaderH+rows.length*rowH+20;
@@ -790,8 +793,8 @@ function exportJPG(mode='7'){
  c.fillStyle=ink;c.textAlign='left';c.font='22px Arial';c.fillText(fit(q.customer||'',470,'22px Arial'),235,347);
  c.fillText(fit(q.customerInfo||'',570,'22px Arial'),990,347);
  // seven-column quote table
- const cols=isFour?[22,100,285,1370,1578]:[22,100,285,920,1020,1105,1325,1578];
- const headers=isFour?['STT','LINH KIỆN','CHI TIẾT / MODEL','BH']:['STT','LINH KIỆN','CHI TIẾT / MODEL','BH','SL','ĐƠN GIÁ','THÀNH TIỀN'];
+ const cols=isFour?[22,100,285,1040,1370,1578]:[22,100,285,790,920,1020,1105,1325,1578];
+ const headers=isFour?['STT','LINH KIỆN','CHI TIẾT / MODEL','HÌNH THỨC','BH']:['STT','LINH KIỆN','CHI TIẾT / MODEL','HÌNH THỨC','BH','SL','ĐƠN GIÁ','THÀNH TIỀN'];
  c.fillStyle=grad(22,headerY,W-44,tableHeaderH,'#111','#292929');c.fillRect(22,headerY,W-44,tableHeaderH);
  c.strokeStyle=gold;c.lineWidth=2;c.strokeRect(22,headerY,W-44,tableHeaderH);
  c.fillStyle=gold;c.font='bold 25px Arial';c.textAlign='center';
@@ -805,12 +808,13 @@ function exportJPG(mode='7'){
   c.font='25px Arial';c.fillText(String(i+1),(cols[0]+cols[1])/2,cy);
   c.font='bold 25px Arial';c.fillText(fit(r.category||'',cols[2]-cols[1]-12,'bold 25px Arial'),(cols[1]+cols[2])/2,cy);
   c.font='25px Arial';c.fillText(fit(r.name||'',cols[3]-cols[2]-18,'25px Arial'),(cols[2]+cols[3])/2,cy);
-  if(isFour){c.fillText(fit(r.warranty||'',cols[4]-cols[3]-12,'25px Arial'),(cols[3]+cols[4])/2,cy)}
+  c.font='bold 23px Arial';c.fillText(fit(r.condition||'',cols[4]-cols[3]-12,'bold 23px Arial'),(cols[3]+cols[4])/2,cy);
+  if(isFour){c.font='25px Arial';c.fillText(fit(r.warranty||'',cols[5]-cols[4]-12,'25px Arial'),(cols[4]+cols[5])/2,cy)}
   else{
-   c.fillText(fit(r.warranty||'',cols[4]-cols[3]-8,'25px Arial'),(cols[3]+cols[4])/2,cy);
-   c.fillText(String(r.qty??1),(cols[4]+cols[5])/2,cy);
-   c.textAlign='right';c.fillText(money(Number(r.price)||0),cols[6]-12,cy);
-   c.font='bold 25px Arial';c.fillText(money((Number(r.qty)||0)*(Number(r.price)||0)),cols[7]-12,cy);
+   c.font='25px Arial';c.fillText(fit(r.warranty||'',cols[5]-cols[4]-8,'25px Arial'),(cols[4]+cols[5])/2,cy);
+   c.fillText(String(r.qty??1),(cols[5]+cols[6])/2,cy);
+   c.textAlign='right';c.fillText(money(Number(r.price)||0),cols[7]-12,cy);
+   c.font='bold 25px Arial';c.fillText(money((Number(r.qty)||0)*(Number(r.price)||0)),cols[8]-12,cy);
   }
  });
  // total strip; honors the editable total override
