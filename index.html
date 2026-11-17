@@ -139,7 +139,7 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
   <div class="grid" style="grid-template-columns:repeat(6,minmax(0,1fr));margin-bottom:10px">
    <div class="field"><label>NHÓM LINH KIỆN</label><input id="vaultCategory" placeholder="CPU / MAIN / RAM..."></div>
    <div class="field" style="grid-column:span 2"><label>TÊN LINH KIỆN / MODEL</label><input id="vaultName" placeholder="Ví dụ: Intel Core i5 14400F"></div>
-   <div class="field"><label>HÌNH THỨC</label><select id="vaultCondition"><option value="">-- Chọn --</option><option>NEW</option><option>NEW TRAY</option><option>2ND</option></select></div>
+   <div class="field"><label>HÌNH THỨC</label><select id="vaultCondition"><option value="">-- Chọn --</option><option>NEW</option><option>NEW TRAY</option><option>LIKE NEW</option><option>2ND</option></select></div>
    <div class="field"><label>BẢO HÀNH</label><input id="vaultWarranty" placeholder="36T"></div>
    <div class="field"><label>GIÁ BÁN (VNĐ)</label><input id="vaultPrice" type="number" min="0" step="1000" placeholder="0"></div>
   </div>
@@ -327,7 +327,7 @@ function addRow(item={}){
  tr.innerHTML=`<td class="stt"></td>
  <td><input class="category" placeholder="CPU" value="${esc(item.category||'')}"></td>
  <td><input class="name" list="vaultPartSuggestions" autocomplete="off" placeholder="Nhập tên để tìm linh kiện..." value="${esc(item.name||'')}"></td>
- <td><select class="condition"><option value="">-- Chọn --</option><option value="NEW" ${item.condition==='NEW'?'selected':''}>NEW</option><option value="NEW TRAY" ${item.condition==='NEW TRAY'?'selected':''}>NEW TRAY</option><option value="2ND" ${item.condition==='2ND'?'selected':''}>2ND</option></select></td>
+ <td><select class="condition"><option value="">-- Chọn --</option><option value="NEW" ${item.condition==='NEW'?'selected':''}>NEW</option><option value="NEW TRAY" ${item.condition==='NEW TRAY'?'selected':''}>NEW TRAY</option><option value="LIKE NEW" ${item.condition==='LIKE NEW'?'selected':''}>LIKE NEW</option><option value="2ND" ${item.condition==='2ND'?'selected':''}>2ND</option></select></td>
  <td><input class="warranty" placeholder="36T" value="${esc(item.warranty||'')}"></td>
  <td><input class="qty" type="number" min="0" step="1" value="${item.qty??1}"></td>
  <td><input class="price money" inputmode="numeric" placeholder="0" value="${item.price??''}"></td>
