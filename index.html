@@ -633,46 +633,88 @@ function exportInstallmentJPG(){
  canvas.width=1752;canvas.height=897;
  const c=canvas.getContext('2d');
  c.scale(1.8,1.8);
- c.fillStyle='#fff';c.fillRect(0,0,973.333,498.333);
+ const W=973.333,H=498.333;
+ c.fillStyle='#fff';c.fillRect(0,0,W,H);
+
  const roundRect=(x,y,w,h,r,color)=>{
   c.beginPath();c.roundRect(x,y,w,h,r);c.fillStyle=color;c.fill();
  };
- // Header banner
- roundRect(12,10,949,55,15,'#1260b5');
- c.fillStyle='#fff';c.font='900 25px Arial';c.textAlign='center';
- c.fillText('BẢNG THANH TOÁN SẢN PHẨM',486.5,47);
- // Table frame and rows
- const x=12,y=78,w=949,rowH=43,leftW=493;
+ const gradient=(x,y,w,h,stops)=>{
+  const g=c.createLinearGradient(x,y,x+w,y+h);
+  stops.forEach(([p,col])=>g.addColorStop(p,col));
+  return g;
+ };
+ // Header: HD SAISON brand area and blue title ribbon
+ c.fillStyle='#fff';c.fillRect(0,0,W,76);
+ c.save();
+ c.textAlign='left';
+ c.font='italic 900 39px Arial';
+ c.fillStyle='#c8102e';c.fillText('HD',48,43);
+ c.fillStyle='#064b9b';c.fillText('SAISON',96,43);
+ c.font='bold 10px Arial';c.fillStyle='#064b9b';c.fillText('®',239,24);
+ // yellow/red brand underline and tagline
+ c.beginPath();c.moveTo(45,49);c.lineTo(252,49);c.lineTo(242,61);c.lineTo(40,61);c.closePath();
+ c.fillStyle=gradient(40,49,212,12,[[0,'#ffcf22'],[.55,'#f28b16'],[1,'#c8102e']]);c.fill();
+ c.font='italic bold 11px Arial';c.fillStyle='#fff';c.fillText('Tài chính tiêu dùng',112,59);
+ c.strokeStyle='#173b72';c.lineWidth=1.5;c.beginPath();c.moveTo(285,18);c.lineTo(285,62);c.stroke();
+ // Main blue banner
+ roundRect(315,8,635,62,15,gradient(315,8,635,62,[[0,'#064a9d'],[.55,'#063f91'],[1,'#082e78']]));
+ c.save();
+ c.beginPath();c.roundRect(315,8,635,62,15);c.clip();
+ c.fillStyle='#ffca19';c.beginPath();c.moveTo(810,70);c.quadraticCurveTo(900,56,950,8);c.lineTo(950,34);c.quadraticCurveTo(900,78,840,70);c.fill();
+ c.fillStyle='#d30b2f';c.beginPath();c.moveTo(875,70);c.quadraticCurveTo(930,51,950,30);c.lineTo(950,70);c.closePath();c.fill();
+ c.restore();
+ c.textAlign='center';c.fillStyle='#fff';c.font='900 36px Arial';
+ c.fillText('BẢNG GÓP HD SAISON',625,55);
+ c.restore();
+
+ // Two-column repayment table
+ const x=11,y=79,w=951,rowH=41.5,leftW=520;
  const labels=[
-  ['🛒','Giá sản phẩm',fmt(price)+'đ','#d9efff'],
+  ['🛒','Giá sản phẩm',fmt(price)+'đ','#dceeff'],
   ['🔴','% Trả trước',percent.toLocaleString('vi-VN',{maximumFractionDigits:2})+'%','#fce9ed'],
   ['🪙','Trả trước',fmt(down)+'đ','#fce9ed'],
-  ['💰','Vay',fmt(loan)+'đ','#fce9ed'],
-  ['🗓️','9 tháng',fmt(monthly(plans[0]))+'đ/tháng','#fff0d2'],
-  ['🗓️','12 tháng',fmt(monthly(plans[1]))+'đ/tháng','#fff0d2'],
-  ['🗓️','15 tháng',fmt(monthly(plans[2]))+'đ/tháng','#fff0d2'],
-  ['', 'Số tháng góp','Số tiền đóng hàng tháng','#d9efff']
+  ['💰','Vay (HD SAISON)',fmt(loan)+'đ','#fce9ed'],
+  ['🗓️','Góp 9 tháng',fmt(monthly(plans[0]))+'đ/tháng','#fff1d0'],
+  ['🗓️','Góp 12 tháng',fmt(monthly(plans[1]))+'đ/tháng','#fff1d0'],
+  ['🗓️','Góp 15 tháng',fmt(monthly(plans[2]))+'đ/tháng','#fff1d0'],
+  ['▤','Số tháng góp','Số tiền đóng hàng tháng','#dceeff']
  ];
  c.save();
- c.beginPath();c.roundRect(x,y,w,rowH*8,14);c.clip();
+ c.beginPath();c.roundRect(x,y,w,rowH*8,16);c.clip();
  labels.forEach((r,i)=>{
   const yy=y+i*rowH;
   c.fillStyle=r[3];c.fillRect(x,yy,w,rowH);
   if(i>0){c.strokeStyle='#17477f';c.lineWidth=1;c.beginPath();c.moveTo(x,yy);c.lineTo(x+w,yy);c.stroke();}
-  c.fillStyle='#10264a';c.textAlign='left';c.font=i===7?'bold 15px Arial':'bold 19px Arial';
-  if(r[0])c.fillText(r[0],x+14,yy+28);
-  c.fillText(r[1],x+(r[0]?58:20),yy+28);
-  c.textAlign='center';c.font=i===7?'bold 14px Arial':'bold 19px Arial';
-  c.fillText(r[2],x+leftW+(w-leftW)/2,yy+28);
+  c.textAlign='left';c.fillStyle='#071d50';
+  c.font=i===7?'bold 25px Arial':'bold 22px Arial';
+  c.fillText(r[0],x+27,yy+29);
+  c.fillText(r[1],x+86,yy+29);
+  c.textAlign='center';c.font=i===7?'bold 21px Arial':'bold 23px Arial';
+  c.fillText(r[2],x+leftW+(w-leftW)/2,yy+29);
  });
- c.strokeStyle='#17477f';c.lineWidth=2.5;c.strokeRect(x,y,w,rowH*8);
+ c.strokeStyle='#17477f';c.lineWidth=2;c.strokeRect(x,y,w,rowH*8);
  c.beginPath();c.moveTo(x+leftW,y);c.lineTo(x+leftW,y+rowH*8);c.stroke();
  c.restore();
- // Procedure footer
- roundRect(12,432,949,56,15,'#ffcf3e');
- c.fillStyle='#10264a';c.textAlign='center';c.font='bold 18px Arial';
- c.fillText('🪪 Thủ tục: CCCD gắn chip – CCCD mới',486.5,467);
- const fileName='HUYNH-CANH-PC-BANG-THANH-TOAN-1752x897.jpg';
+
+ // Red and gold procedure banner
+ roundRect(11,431,951,53,14,gradient(11,431,951,53,[[0,'#bd0927'],[.55,'#e20d28'],[1,'#bd0927']]));
+ c.save();
+ c.beginPath();c.roundRect(11,431,951,53,14);c.clip();
+ c.fillStyle='#ffcf20';c.beginPath();c.moveTo(760,484);c.quadraticCurveTo(875,461,962,431);c.lineTo(962,484);c.closePath();c.fill();
+ c.fillStyle='#f6b900';c.beginPath();c.moveTo(830,484);c.quadraticCurveTo(914,459,962,441);c.lineTo(962,454);c.quadraticCurveTo(905,480,870,484);c.fill();
+ c.restore();
+ // ID card icon and text
+ c.strokeStyle='#fff';c.lineWidth=2.5;c.beginPath();c.roundRect(205,443,47,30,5);c.stroke();
+ c.beginPath();c.arc(218,453,5,0,Math.PI*2);c.stroke();
+ c.beginPath();c.moveTo(211,466);c.quadraticCurveTo(218,457,225,466);c.stroke();
+ c.beginPath();c.moveTo(231,451);c.lineTo(245,451);c.moveTo(231,458);c.lineTo(245,458);c.moveTo(231,465);c.lineTo(241,465);c.stroke();
+ c.fillStyle='#fff';c.textAlign='left';c.font='bold 23px Arial';
+ c.fillText('Thủ tục đơn giản:',285,467);
+ c.fillStyle='#ffdf35';c.textAlign='left';c.font='900 23px Arial';
+ c.fillText('CCCD gắn chip – CCCD mới',493,467);
+
+ const fileName='HUYNH-CANH-PC-BANG-GOP-HD-SAISON.jpg';
  canvas.toBlob(async blob=>{
   if(!blob){alert('Không thể tạo ảnh JPG. Vui lòng thử lại.');return;}
   const file=new File([blob],fileName,{type:'image/jpeg'});
