@@ -34,6 +34,8 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
 .totalbar{display:flex;margin-top:13px;background:#15171b;color:white;align-items:center;min-height:54px}
 .totalbar .label{flex:1;text-align:center;font-size:clamp(17px,3vw,25px);font-weight:900;color:#fff;padding:10px}
 .totalbar .amount{background:var(--blue);padding:13px 16px;font-size:clamp(17px,3vw,23px);font-weight:900;white-space:nowrap}.totalbar .override{width:230px;max-width:42%;background:#fff;color:#111318;border:2px solid #087cf0;border-radius:7px;padding:9px 10px;font-size:18px;font-weight:850;text-align:right;margin:6px}.totalbar .override::placeholder{color:#7a8492;font-size:13px;font-weight:500}
+.totalbar .calcbox{padding:7px 12px;text-align:center;min-width:125px;border-left:1px solid #59606b}.totalbar .calcbox small{display:block;font-size:11px;color:#d7dfeb;font-weight:700}.totalbar .calcbox strong{display:block;font-size:18px;color:#fff;white-space:nowrap}.totalbar .profit strong{color:#7dffb0}
+@media(max-width:760px){.totalbar{flex-wrap:wrap}.totalbar .label{flex-basis:100%}.totalbar .override{flex:1;max-width:none;width:100px}.totalbar .calcbox{flex:1;min-width:95px;padding:7px 5px}.totalbar .calcbox strong{font-size:15px}}
 .notes{margin-top:16px}.notes h3{margin:0;background:#15171b;color:white;padding:10px 12px;font-size:14px}.notes ul{padding-left:22px;margin:8px 0;color:#414b5a}.notes li{margin:5px 0}
 .footer{text-align:center;padding:10px;font-size:18px;font-weight:850;color:var(--blue)}
 .history-list{display:grid;gap:8px}.history-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:9px}.history-item strong{display:block}.history-item small{color:var(--muted)}
@@ -189,7 +191,7 @@ td.total{font-weight:800;text-align:right;white-space:nowrap}
    <button onclick="openSampleConfigPicker()" class="secondary">Nạp cấu hình mẫu</button>
    
   </div>
-  <div class="totalbar"><div class="label">TỔNG GIÁ TRỊ BÁO GIÁ</div><input class="override" id="totalOverride" type="number" min="0" step="1000" placeholder="Tự động tính" title="Nhập giá tổng riêng nếu muốn thay tổng tự động" oninput="calc()"><div class="amount" id="grandTotal">0 đ</div></div><div class="hint">Muốn dùng tổng tự động: xóa số trong ô giá tổng tùy chỉnh. Giá nhập riêng sẽ được lưu cùng báo giá.</div>
+  <div class="totalbar"><div class="label">GIÁ BÁN</div><input class="override" id="totalOverride" type="number" min="0" step="1000" placeholder="Nhập giá bán" title="Nhập giá bán khách hàng thanh toán" oninput="calc()"><div class="calcbox"><small>TỔNG LINH KIỆN</small><strong id="grandTotal">0 đ</strong></div><div class="calcbox profit"><small>LÃI = GIÁ BÁN − TỔNG</small><strong id="profitTotal">0 đ</strong></div></div><div class="hint">Nhập GIÁ BÁN khách thanh toán. TỔNG là tổng tiền linh kiện theo bảng. LÃI = GIÁ BÁN − TỔNG. Để giá bán trống, hệ thống tạm lấy bằng tổng linh kiện (lãi 0đ).</div>
   <section id="installmentPanel" class="card no-print hidden" style="margin-top:14px">
    <div class="toolbar" style="justify-content:space-between">
     <h2 style="margin:0">💳 TÍNH TRẢ GÓP HD SAISON</h2>
@@ -356,8 +358,9 @@ function calc(){
  const v=q*p;sum+=v;tr.querySelector('.total').textContent=money(v);
  });
  const override=String($('totalOverride')?.value||'').trim();
- const finalTotal=override!==''?(Number(override)||0):sum;
- $('grandTotal').textContent=money(finalTotal)+' đ';
+ const salePrice=override!==''?(Number(override)||0):sum;
+ $('grandTotal').textContent=money(sum)+' đ';
+ const profit=$('profitTotal');if(profit)profit.textContent=money(salePrice-sum)+' đ';
 }
 function getQuoteTotal(){const v=String($('totalOverride')?.value||'').trim();if(v!=='')return Number(v)||0;return getRows().reduce((a,r)=>a+r.qty*r.price,0)}
 function updateValid(){$('validText').textContent=($('validHours').value||12)+' giờ kể từ thời điểm gửi';$('noteHours').textContent=$('validHours').value||12}
